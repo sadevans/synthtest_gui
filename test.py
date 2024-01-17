@@ -11,7 +11,7 @@ from matplotlib.figure import Figure
 
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLineEdit
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSlider
 from PyQt6.QtGui import QPixmap, QImage, QPainter, QPen
 from PyQt6.QtCore import Qt, QTimer
     
@@ -21,6 +21,11 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.radius = 50
+        self.border_width = 10
+        self.resist_thickness = 700
+        self.pixel_size = 12
+        self.transform_algo = 'bezier'
+        self.algo = 'algo1'
 
 
         self.init_ui()
@@ -93,9 +98,6 @@ class MainWindow(QMainWindow):
         vertical_layout_square.addWidget(toolbar_square, )
         # vertical_layout_square.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
 
-
-
-
         horizontal_layout_imgs.addLayout(vertical_layout_circle)
         horizontal_layout_imgs.addLayout(vertical_layout_square)
 
@@ -105,38 +107,111 @@ class MainWindow(QMainWindow):
         horizontal_layout_imgs.setContentsMargins(0, 0, 0, 0)
 
 
-
-
-
-        # self.layout.addLayout(horizontal_layout_imgs)
-
-
         # рендер конфигуратора
-        # vertical_layout_config
-        hole_width = QHBoxLayout()
+
+        # hole width
+        hole_width_box = QHBoxLayout()
         self.label_hole_width = QLabel("Ширина дна")
-        self.hole_width_input = QLineEdit(str(self.radius))
+        self.hole_width_input = QLineEdit(str(2*self.radius))
         self.hole_width_input.setFixedWidth(150)
+        self.hole_width_input.returnPressed.connect(self.change_hole_width_on_enter_pressed)
+        hole_width_box.addWidget(self.label_hole_width, alignment= Qt.AlignmentFlag.AlignLeft)
+        hole_width_box.addWidget(self.hole_width_input, alignment= Qt.AlignmentFlag.AlignCenter)
+        vertical_layout_config.addLayout(hole_width_box)
 
-        self.hole_width_input.returnPressed.connect(self.on_enter_pressed)
+        # border width
+        border_width_box = QHBoxLayout()
+        self.label_border_width = QLabel("Толщина границы")
+        self.border_width_slider = QSlider(Qt.Orientation.Horizontal)
+        self.border_width_slider.setRange(1, 50)
+        self.border_width_slider.setValue(self.border_width)
+        self.border_width_slider.setFixedWidth(150)
+        self.border_width_slider.setTickPosition(QSlider.TickPosition.TicksAbove)
+        self.result_border_label = QLabel(f'Текущее значение: {self.border_width}', self)
+        self.border_width_slider.valueChanged.connect(self.update_border_width_slider)
+        border_width_box.addWidget(self.label_border_width, alignment= Qt.AlignmentFlag.AlignLeft)
+        border_width_box.addWidget(self.border_width_slider, alignment= Qt.AlignmentFlag.AlignCenter)
+        border_width_box.addWidget(self.result_border_label, alignment= Qt.AlignmentFlag.AlignRight)
+        vertical_layout_config.addLayout(border_width_box)
 
-        # self.hole_width_input.textChanged.connect(self.check)
+        # resist thickness
+        resist_thickness_box = QHBoxLayout()
+        self.label_resist_thickness = QLabel("Толщина слоя резиста (нм)")
+        self.resist_thickness_input = QLineEdit(str(self.resist_thickness))
+        self.resist_thickness_input.setFixedWidth(150)
+        self.resist_thickness_input.returnPressed.connect(self.change_resist_thick_enter_press)
+        resist_thickness_box.addWidget(self.label_resist_thickness, alignment= Qt.AlignmentFlag.AlignLeft)
+        resist_thickness_box.addWidget(self.resist_thickness_input, alignment= Qt.AlignmentFlag.AlignCenter)
+        vertical_layout_config.addLayout(resist_thickness_box)
 
-        hole_width.addWidget(self.label_hole_width, alignment= Qt.AlignmentFlag.AlignCenter)
+        # pixel size
+        pixel_size_box = QHBoxLayout()
+        self.label_pixel_size = QLabel("Размер пикселя (нм)")
+        self.pixel_size_input = QLineEdit(str(self.pixel_size))
+        self.pixel_size_input.setFixedWidth(150)
+        self.pixel_size_input.returnPressed.connect(self.change_pixel_size_enter_press)
+        pixel_size_box.addWidget(self.label_pixel_size, alignment= Qt.AlignmentFlag.AlignLeft)
+        pixel_size_box.addWidget(self.pixel_size_input, alignment= Qt.AlignmentFlag.AlignCenter)
+        vertical_layout_config.addLayout(pixel_size_box)
 
-        hole_width.addWidget(self.hole_width_input, alignment= Qt.AlignmentFlag.AlignCenter)
+        # border algo
+        choose_algo_box = QHBoxLayout()
+        self.label_choose_algo_box = QLabel("Алгоритм вычисления ширины границ")
+        self.button_1 = QPushButton('Поиск ближайшей точки в массиве')
+        self.button_2 = QPushButton('Увеличение радиуса из точки границы')
+        self.button_1.clicked.connect(lambda: self.update_algo('algo1'))
+        self.button_2.clicked.connect(lambda: self.update_algo('algo2'))
+        choose_algo_box.addWidget(self.label_choose_algo_box, alignment= Qt.AlignmentFlag.AlignLeft)
+        choose_algo_box.addWidget(self.button_1, alignment= Qt.AlignmentFlag.AlignCenter)
+        choose_algo_box.addWidget(self.button_2, alignment= Qt.AlignmentFlag.AlignRight)
+        vertical_layout_config.addLayout(choose_algo_box)
 
-        vertical_layout_config.addLayout(hole_width)
+
+        # transform angle algo
+        choose_transform_algo_box = QHBoxLayout()
+        self.label_choose_transform_algo_box = QLabel("Алгоритм преобразования углов")
+        self.button_transform_bezier = QPushButton('Безье')
+        self.button_transform_parabola = QPushButton('Парабола')
+        self.button_transform_bezier.clicked.connect(lambda: self.update_algo_transform('bezier'))
+        self.button_transform_parabola.clicked.connect(lambda: self.update_algo_transform('parabola'))
+        choose_transform_algo_box.addWidget(self.label_choose_transform_algo_box, alignment= Qt.AlignmentFlag.AlignLeft)
+        choose_transform_algo_box.addWidget(self.button_transform_bezier, alignment= Qt.AlignmentFlag.AlignCenter)
+        choose_transform_algo_box.addWidget(self.button_transform_parabola, alignment= Qt.AlignmentFlag.AlignRight)
+        vertical_layout_config.addLayout(choose_transform_algo_box)
+
 
         horizontal_layout_imgs.addLayout(vertical_layout_config)
         self.layout.addLayout(horizontal_layout_imgs)
 
 
-    def on_enter_pressed(self):
+    def update_algo(self, value):
+        self.border_width_algo = value
+
+    def update_algo_transform(self, value):
+        self.transform_algo = value
+
+    def update_border_width_slider(self, value):
+        self.result_border_label.setText(f'Текущее значение: {value}')
+
+
+    def change_resist_thick_enter_press(self):
+        text = self.resist_thickness_input.text()
+        # print("Text from QLineEdit:", text)
+
+        self.resist_thickness = int(text)
+
+    def change_pixel_size_enter_press(self):
+        text = self.pixel_size_input.text()
+        # print("Text from QLineEdit:", text)
+
+        self.pixel_size = int(text)
+
+
+    def change_hole_width_on_enter_pressed(self):
         text = self.hole_width_input.text()
         # print("Text from QLineEdit:", text)
 
-        self.radius = int(text)
+        self.radius = int(text)//2
         self.update_images()
 
 
@@ -251,43 +326,6 @@ class MainWindow(QMainWindow):
         square_image = self.generate_square_image()
         self.mask_label_2.setPixmap(self.convert_ndarray_to_pixmap(square_image))
 
-        # self.update_plot_circle()
-        # self.update_plot_square()
-
-
-
-    # def update_plot_circle(self):
-    #     # Get the existing canvas from the layout
-    #     canvas_circle = self.layout.itemAt(0).itemAt(0).itemAt(0).widget() if self.layout.count() > 0 else None
-    #     # canvas_circle = self.layout.itemAt(0).itemAt(0).itemAt(0).widget()
-    #     self.clear_plot(canvas_circle)
-    #     self.create_plot_circle(canvas_circle)
-
-    # def update_plot_square(self):
-    #     canvas_square = self.layout.itemAt(0).itemAt(1).itemAt(0).widget()
-    #     self.clear_plot(canvas_square)
-    #     self.create_plot_square(canvas_square)
-
-    # def clear_plot(self, canvas):
-    #     canvas.figure.clf()
-    #     canvas.draw()
-
-
-    # def generate_images(self):
-    #     self.circle_image = 255*np.zeros((300, 300), dtype=np.uint8) # blank image
-    #     self.square_image = 255*np.zeros((300, 300), dtype=np.uint8) # blank image
-    #     center = (150, 150)
-
-    #     cv2.circle(self.circle_image, center, self.radius, 255, 2)
-    #     cv2.circle(self.circle_image, center, self.radius, 255, -1)
-
-    #     self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius), center[1]-(self.radius)), 
-    #               (center[0] + (self.radius), center[1]+ (self.radius)), 255, 20) 
-    #     self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius), center[1]-(self.radius)), 
-    #               (center[0] + (self.radius), center[1]+ (self.radius)), 255, -1)
-        
-    #     return self.circle_image, self.square_image
-        
 
 
     def generate_circle_image(self):
