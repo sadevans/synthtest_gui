@@ -5,19 +5,17 @@ import matplotlib
 matplotlib.use('QtAgg')
 
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Cursor
+# from matplotlib.widgets import Cursor
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
-from matplotlib.figure import Figure
-
+# from matplotlib.figure import Figure
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSlider
-from PyQt6.QtGui import QPixmap, QImage, QPainter, QPen
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtGui import QPixmap, QImage
+from PyQt6.QtCore import Qt
 
-from src import Solver
+from src.Solver import *
     
-
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -28,7 +26,9 @@ class MainWindow(QMainWindow):
 
         self.radius = 50
         self.border_width = 10
+
         self.resist_thickness = 700
+        self.silicon_thickness = 100
         self.pixel_size = 12
         self.transform_algo = 'bezier'
         self.algo = 'algo1'
@@ -67,6 +67,9 @@ class MainWindow(QMainWindow):
 
 
         self.update_images()
+
+        # self.solv = Solver(algo=self.algo, transform_algo = self.transform_algo, pixel_size=self.pixel_size, \
+                    #   resist_thickness=self.resist_thickness, masks = [self.circle_image, self.square_image])
 
         # self.icon_label_1 = QLabel()
         # self.icon_label_1.mousePressEvent = self.on_icon_click
@@ -219,16 +222,16 @@ class MainWindow(QMainWindow):
 
 
         # transform angle algo
-        choose_transform_algo_box = QHBoxLayout()
-        self.label_choose_transform_algo_box = QLabel("Алгоритм преобразования углов")
-        self.button_transform_bezier = QPushButton('Безье')
-        self.button_transform_parabola = QPushButton('Парабола')
-        self.button_transform_bezier.clicked.connect(lambda: self.update_algo_transform('bezier'))
-        self.button_transform_parabola.clicked.connect(lambda: self.update_algo_transform('parabola'))
-        choose_transform_algo_box.addWidget(self.label_choose_transform_algo_box, alignment= Qt.AlignmentFlag.AlignLeft)
-        choose_transform_algo_box.addWidget(self.button_transform_bezier, alignment= Qt.AlignmentFlag.AlignCenter)
-        choose_transform_algo_box.addWidget(self.button_transform_parabola, alignment= Qt.AlignmentFlag.AlignRight)
-        vertical_layout_config.addLayout(choose_transform_algo_box)
+        # choose_transform_algo_box = QHBoxLayout()
+        # self.label_choose_transform_algo_box = QLabel("Алгоритм преобразования углов")
+        # self.button_transform_bezier = QPushButton('Безье')
+        # self.button_transform_parabola = QPushButton('Парабола')
+        # self.button_transform_bezier.clicked.connect(lambda: self.update_algo_transform('bezier'))
+        # self.button_transform_parabola.clicked.connect(lambda: self.update_algo_transform('parabola'))
+        # choose_transform_algo_box.addWidget(self.label_choose_transform_algo_box, alignment= Qt.AlignmentFlag.AlignLeft)
+        # choose_transform_algo_box.addWidget(self.button_transform_bezier, alignment= Qt.AlignmentFlag.AlignCenter)
+        # choose_transform_algo_box.addWidget(self.button_transform_parabola, alignment= Qt.AlignmentFlag.AlignRight)
+        # vertical_layout_config.addLayout(choose_transform_algo_box)
 
 
         horizontal_layout_imgs.addLayout(vertical_layout_config)
@@ -249,20 +252,31 @@ class MainWindow(QMainWindow):
     def update_algo(self, value):
         self.border_width_algo = value
 
+
     def update_algo_transform(self, value):
         self.transform_algo = value
 
+
     def update_border_width_slider(self, value):
         self.result_border_label.setText(f'Текущее значение: {value}')
+        self.border_width = value
+        self.update_images()
+        self.update_plots()
+
 
 
     def change_resist_thick_enter_press(self):
         text = self.resist_thickness_input.text()
         self.resist_thickness = int(text)
+        self.update_images()
+        self.update_plots()
+
 
     def change_pixel_size_enter_press(self):
         text = self.pixel_size_input.text()
         self.pixel_size = int(text)
+        self.update_images()
+        self.update_plots()
 
 
     def change_hole_width_on_enter_pressed(self):
@@ -278,133 +292,53 @@ class MainWindow(QMainWindow):
                 print("Invalid Character entered")
                 return
             else: print(self.hole_width_input.text())
-                
-
-    def mouse_callback(self, event):
-        if event.buttons() == Qt.MouseButton.LeftButton:
-            print("Clicked Position: x =", event.pos().x(), ", y =", event.pos().y())
-
-
-
-    def mouse_press_event(self, event):
-        print('press !')
-        # self.start_point = event.pos()
-
-    def mouse_move_event(self, event):
-        print('move !')
-
-        # if hasattr(self, 'start_point'):
-        #     end_point = event.pos()
-        #     pixmap = self.image_label_1.pixmap()
-        #     painter = QPainter(pixmap)
-        #     pen = QPen(Qt.GlobalColor.red)
-        #     pen.setWidth(2)
-        #     painter.setPen(pen)
-        #     painter.drawLine(self.start_point, end_point)
-        #     self.image_label_1.setPixmap(pixmap)
-
-    def mouse_release_event(self, event):
-        print('update')
-        # self.update_plot_circle()
-
-
-    # def create_plot_circle(self, data=None):
-    #     # print('here')
-    #     if data is None:
-    #         data = self.circle_image[150,:]
-    #     self.fig = Figure(figsize=(1,1), dpi=100)
-    #     self.ax = self.fig.add_subplot(111)
-    #     self.ax.cla()
-
-    #     self.ax.plot(data)
-    #     self.ax.grid()
-    #     self.ax.set_title('Срез по центру круга')
-
-
-    #     cursor = Cursor(self.ax, horizOn = True, vertOn=True, color='red', linewidth=1, 
-    #             useblit=True)
-    #     # Creating an annotating box
-    #     annot = self.ax.annotate("", xy=(0,0), xytext=(-40,40),textcoords="offset points",
-    #                         bbox=dict(boxstyle='round4', fc='linen',ec='k',lw=1),
-    #                         arrowprops=dict(arrowstyle='->'))
-    #     annot.set_visible(False)
-    #     coord = []
-
-    #     def onclick(event):
-    #         # global coord
-    #         coord = []
-    #         coord.append((event.xdata, event.ydata))
-    #         x = event.xdata
-    #         y = event.ydata
-            
-    #         # printing the values of the selected point
-    #         print([x,y]) 
-    #         annot.xy = (x,y)
-    #         text = "({:.2f}, {:.2f})".format(x,y)
-    #         annot.set_text(text)
-    #         annot.set_visible(True)
-    #         self.fig.canvas.draw() #redraw the figure
-
-
-    #     self.fig.canvas.mpl_connect('button_press_event', onclick)
-    #     return FigureCanvas(self.fig)
-    
-    
-    # def create_plot_square(self):
-    #     fig = Figure(figsize=(1,1), dpi=100)
-    #     ax = fig.add_subplot(111)
-    #     ax.cla()
-    #     ax.plot(self.square_image[150,:])
-    #     ax.grid()
-    #     ax.set_title('Срез по центру квадрата')
-
-    #     cursor = Cursor(ax, horizOn=True, vertOn=True, useblit=True,
-    #             color = 'r', linewidth = 1)
-    #     # Creating an annotating box
-    #     annot = ax.annotate("", xy=(0,0), xytext=(-40,40),textcoords="offset points",
-    #                         bbox=dict(boxstyle='round4', fc='linen',ec='k',lw=1),
-    #                         arrowprops=dict(arrowstyle='-|>'))
-    #     annot.set_visible(False)
-
-    #     canvas = FigureCanvas(fig)
-    #     # canvas.toolbar.setVisible(True)
-
-    #     return canvas
     
 
     def update_images(self):
-        # Создаем изображение с кругом
-        circle_image = self.generate_circle_image()
-        self.mask_label_1.setPixmap(self.convert_ndarray_to_pixmap(circle_image))
+        self.circle_image = self.generate_circle_image()
+        self.square_image = self.generate_square_image()
 
-        # Создаем изображение с квадратом
-        square_image = self.generate_square_image()
-        self.mask_label_2.setPixmap(self.convert_ndarray_to_pixmap(square_image))
+        solv = Solver(algo=self.algo, transform_algo = self.transform_algo, pixel_size=self.pixel_size, \
+                      resist_thickness=self.resist_thickness, masks = [self.circle_image, self.square_image])
+        # print(len(solv.mask_objects))
+        self.circle_signal = solv.mask_objects[0].signal
+        self.square_signal = solv.mask_objects[1].signal
 
-
-    def update_icons(self):
-        # Создаем изображение с кругом
-        self.icon_circle_image = self.generate_circle_image()
-        # self.icon_label_1.setPixmap(self.convert_ndarray_to_pixmap(circle_image))
-
-        # Создаем изображение с квадратом
-        self.icon_square_image = self.generate_square_image()
-        # self.icon_label_2.setPixmap(self.convert_ndarray_to_pixmap(circle_image))
-        self.icon_label_1.setPixmap(self.convert_ndarray_to_pixmap(self.icon_square_image))
+        self.mask_label_1.setPixmap(self.convert_ndarray_to_pixmap(self.circle_signal))
+        self.mask_label_2.setPixmap(self.convert_ndarray_to_pixmap(self.square_signal))
 
 
-        # self.create_plot_circle(self.circle_image)
+
+        # self.mask_label_1.setPixmap(self.convert_ndarray_to_pixmap(circle_image))
+
+        # square_image = self.generate_square_image()
+        # self.mask_label_2.setPixmap(self.convert_ndarray_to_pixmap(square_image))
+
+
+    # def update_icons(self):
+    #     # Создаем изображение с кругом
+    #     self.icon_circle_image = self.generate_circle_image()
+    #     # self.icon_label_1.setPixmap(self.convert_ndarray_to_pixmap(circle_image))
+    #     # Создаем изображение с квадратом
+    #     self.icon_square_image = self.generate_square_image()
+    #     # self.icon_label_2.setPixmap(self.convert_ndarray_to_pixmap(circle_image))
+    #     self.icon_label_1.setPixmap(self.convert_ndarray_to_pixmap(self.icon_square_image))
+    #     # self.create_plot_circle(self.circle_image)
 
 
     def update_plots(self):
         self.ax_circle.cla()
-        self.ax_circle.plot(self.circle_image[self.slice_y1, :])
+        # self.ax_circle.plot(self.circle_image[self.slice_y1, :])
+        self.ax_circle.plot(self.circle_signal[self.slice_y1, :])
+
         self.ax_circle.grid()
         self.ax_circle.set_title('Срез по центру круга')
         self.canvas_circle.draw()
 
         self.ax_square.cla()
-        self.ax_square.plot(self.square_image[self.slice_y1, :])
+        # self.ax_square.plot(self.square_image[self.slice_y1, :])
+        self.ax_square.plot(self.square_signal[self.slice_y1, :])
+
         self.ax_square.grid()
         self.ax_square.set_title('Срез по центру квадрата')
         self.canvas_square.draw()

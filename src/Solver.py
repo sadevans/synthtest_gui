@@ -1,0 +1,598 @@
+import numpy as np
+import scipy
+import matplotlib.pyplot as plt
+import cv2
+import random
+import torch
+import multiprocessing
+import time
+from skimage.draw import line
+
+
+class Figure():
+    def __init__(self, hole_contour):
+        # print('hole cont:', hole_contour)
+        self.hole_contour = hole_contour.copy()
+        self.border_width = 0
+        self.border_contour = hole_contour.copy()
+
+
+class Image():
+    def __init__(self, mask: np.array):
+        self.mask = mask
+        self.color_map = np.zeros_like(mask)
+        self.angles_map = np.zeros_like(mask)
+        self.width_map = np.zeros_like(mask)
+
+        self.signal = np.zeros_like(mask)
+        self.noisy = np.zeros_like(mask)
+
+
+        self.objects = []
+
+    
+    def detect_cont(self, img):
+        cont, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        return cont
+
+
+    def init_contours(self):
+        mask_hole = cv2.inRange(self.mask, 255, 255)
+        mask_border = cv2.inRange(self.mask, 128, 128)
+
+        c_int_ = self.detect_cont(mask_hole)
+        c_ext_ = self.detect_cont(mask_border)
+
+        for i in range(len(c_ext_)):
+            for j in range(len(c_int_)):
+                temp_bord = np.zeros_like(self.mask)
+                cv2.drawContours(temp_bord, [c_ext_[i]], -1, 128, -1)
+                temp_hole = np.zeros_like(self.mask)
+                cv2.drawContours(temp_hole, [c_int_[j]], -1, 255, -1)
+                set_border = set(map(tuple, np.argwhere(temp_bord==128)))
+                set_hole = set(map(tuple, np.argwhere(temp_hole==255)))
+                if set_hole.issubset(set_border):
+                    obj = Figure(c_int_[j].reshape(-1, 2)) # создаем объекты класса Figure
+                    obj.border_contour = c_ext_[i].reshape(-1, 2).copy()
+                    self.objects.append(obj)
+                    # tmp = np.zeros_like(self.mask)
+                    # cv2.drawContours(tmp, [obj.border_contour], -1, 128, 0)
+                    # cv2.drawContours(tmp, [obj.hole_contour], -1, 255, 0)
+
+                    # plt.imshow(tmp)
+                    # plt.show()
+
+
+
+class Solver():
+    def __init__(self, algo: str, transform_algo: str, pixel_size: int, resist_thickness: int, masks: list):
+        self.algo = algo
+        self.transform_algo = transform_algo
+        self.pixel_size = pixel_size
+        self.resist_thickness = resist_thickness
+
+        self.masks_list = masks
+        self.mask_objects = []
+
+        self.color_back = 110
+        self.color_hole = 85
+        self.k = 0.125
+
+        # if self.transform_algo == 'bezier':
+        #     self.transform_func = np.vectorize(self.transform_bezier)
+
+        self.cpu_count = multiprocessing.cpu_count()
+        self.process()
+        # self.process_pool()
+
+    def draw_gradient_line(self, img, start_point, points, colors, thickness=4):
+        start = start_point
+        for i in range(1, len(points) - 1):
+            # if img[start[1], start[0]] == 0 or img[start[1], start[0]] == 255 or img[start[1], start[0]]==128:
+            if i+1 != len(points)-1:
+                cv2.line(img, start, points[i+1], colors[i], thickness)
+            start = points[i]
+    
+
+
+    def closest_point(self, point, array):
+        diff = array - point
+        distance = np.einsum('ij,ij->i', diff, diff)
+        return np.argmin(distance), distance
+    
+
+    def compute_previous_pixel(self, first_pixel, last_pixel, distance=1):
+        x1, y1 = first_pixel
+        x2, y2 = last_pixel
+
+        length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+        length = 1 if length == 0 else length
+        t = -distance / length
+        x_t = np.round((x1 + t * (x2 - x1)), 0).astype(np.int32)
+        y_t = np.round((y1 + t * (y2 - y1)), 0).astype(np.int32)
+
+        return (x_t, y_t)
+    
+
+    def compute_next_pixel(self, first_point, last_point, distance=1):
+        x1, y1 = first_point
+        x2, y2 = last_point
+
+        length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+        t = 1 + distance / length
+        x_t = np.round((x1 + t * (x2 - x1)), 0).astype(np.int32)
+        y_t = np.round((y1 + t * (y2 - y1)), 0).astype(np.int32)
+
+        return (x_t, y_t)
+    
+
+    def detect_cont(self, img):
+        cont, _ = cv2.findContours(img, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        return cont
+    
+
+    def bezier(self, line, t, prev, color_hole, color_back):
+        if prev == 0.0:
+            point1 = (0, color_back)
+            point4 = (len(line), color_hole)
+            eq = lambda point: ((point - point1[0])/(point4[0] - point1[0]))*(point4[1] - point1[1]) + point1[1]
+            # x3 = random.randint(0, len(line)-1)
+            # y3 = random.uniform(self.color_hole, eq(x3))
+            point3 = (0, color_hole)
+            # x2 = random.randint(1, len(line))
+            # y2 = random.uniform(eq(x2)+1,self.color_back)
+            # print(
+            point2 = (len(line), color_back)
+        if prev == 255.0:
+            point1 = (0, color_hole)
+            point4 = (len(line), color_back)
+            eq = lambda point: ((point - point1[0])/(point4[0] - point1[0]))*(point4[1] - point1[1]) + point1[1]
+            # x3 = random.randint(0, len(line)-1)
+            # y3 = random.uniform(eq(x3), self.color_back+1)
+            point3 = (0, color_back)
+            # x2 = random.randint(1, len(line))
+            # y2 = random.uniform(self.color_hole, eq(x2))
+            point2 = (len(line), color_hole)
+
+        x = point1[0]*(1-t)**3 + point2[0]*3*t*(1-t)**2 + point3[0]*3*t**2*(1-t) + point4[0]*t**3
+        vals = point1[1]*(1-t)**3 + point2[1]*3*t*(1-t)**2 + point3[1]*3*t**2*(1-t) + point4[1]*t**3
+        return x, vals
+
+
+    def transform_bezier(self, img, ext, int):
+        width_img = np.zeros_like(img, dtype=np.float32)
+        new_angles = np.zeros_like(img, dtype=np.float32)
+        color_map = np.zeros_like(img, dtype=np.float32)
+
+
+        for cont_ext, cont_int in zip(ext, int):
+            for point in cont_ext:
+                    min_dist = float('inf')
+                    index, dist = self.closest_point(point, cont_int)
+                    if dist[index] < min_dist :
+                        min_dist = dist[index].item()
+                        nearest_point = cont_int[index] 
+                        prev = [self.compute_previous_pixel(point, nearest_point)]
+                        discrete_line = list(zip(*line(*prev[0], *nearest_point))) # find all pixels from the line
+                        dist_ = len(discrete_line) - 2
+
+                    if dist_ > 2:
+                        new_line = np.zeros(dist_*self.pixel_size, dtype=np.float32)
+                        x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, 100, self.resist_thickness)
+
+                        x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+                        reshaped_y  = np.array(y).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        averages_y = np.max(reshaped_y, axis=1)
+
+                        reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        angles = np.arctan(np.abs(np.gradient(y)))
+                        new_angl = angles[::self.pixel_size]
+                        reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        averages_angls = np.max(reshaped_angls, axis=1)
+                        max_indices = np.argmax(reshaped_angls, axis=1)
+                        averages_colors = reshaped_colors[np.arange(len(reshaped_colors)), max_indices]
+                    
+                        self.draw_gradient_line(color_map, point, discrete_line, averages_colors, thickness=2)
+                        self.draw_gradient_line(new_angles, point, discrete_line, averages_angls, thickness=1)
+                    elif dist_ == 2:
+                        new_line = [0] * 2 * self.pixel_size
+                        x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)),0.0, 100, self.resist_thickness)
+                        x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+
+                        angles = np.arctan(np.abs(np.gradient(y)))
+                        reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        averages_angls = np.max(reshaped_angls, axis=1)
+                        max_indices = np.argmax(reshaped_angls, axis=1)
+                        reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        averages_colors = reshaped_colors[np.arange(len(reshaped_colors)), max_indices]
+                        averages_angls = [averages_angls[0], averages_angls[0], averages_angls[1], averages_angls[1]]
+                        averages_colors = [averages_colors[0], averages_colors[0], averages_colors[1], averages_colors[1]]
+
+                        self.draw_gradient_line(color_map, point, discrete_line, averages_colors, thickness=2)
+                        self.draw_gradient_line(new_angles, point, discrete_line, averages_angls, thickness=1)
+
+                    elif dist_ == 1:
+                        y = [self.resist_thickness-10]
+                        averages_colors = [(self.color_back - 2)]
+                        angles = [np.arctan(y[0]/(dist_*self.pixel_size))]
+                        cv2.line(new_angles, point, nearest_point, np.deg2rad(89), 2)
+                        cv2.line(color_map, point, nearest_point, (np.tan(np.deg2rad(89))*self.pixel_size * 110)/self.resist_thickness, 2)
+
+                    cv2.line(width_img, point, nearest_point, dist_, 3)
+
+
+        for cont_ext, cont_int in zip(ext, int):
+            for point in cont_int:
+                    min_dist = float('inf')
+                    index, dist = self.closest_point(point, cont_ext)
+                    if dist[index] < min_dist :
+                        min_dist = dist[index].item()
+                        nearest_point = cont_ext[index]
+                        next = [self.compute_next_pixel(point, nearest_point)]
+                        discrete_line = list(zip(*line(*point, *next[0]))) # find all pixels from the line
+                        dist_ = len(discrete_line) - 2
+
+                    if dist_ == 0:
+                        dist_ = 1
+
+                    if dist_ > 2:
+                        new_line = np.zeros(dist_*self.pixel_size, dtype=np.float32)
+                        x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, 100, self.resist_thickness)
+                        x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, self.color_hole, self.color_back)
+                        reshaped_y  = np.array(y).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        averages_y = np.max(reshaped_y, axis=1)
+                        reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        angles = np.arctan(np.abs(np.gradient(y)))
+                        reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        averages_angls = np.max(reshaped_angls, axis=1)
+                        max_indices = np.argmax(reshaped_angls, axis=1)
+                        averages_colors = reshaped_colors[np.arange(len(reshaped_colors)), max_indices]
+
+                    elif dist_ == 2:
+                        new_line = [0] * 2 * self.pixel_size
+                        x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)),0.0, 100, self.resist_thickness)
+                        x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+                        angles = np.arctan(np.abs(np.gradient(y)))
+                        reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        averages_angls = np.max(reshaped_angls, axis=1)
+                        max_indices = np.argmax(reshaped_angls, axis=1)
+                        reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                        averages_colors = reshaped_colors[np.arange(len(reshaped_colors)), max_indices]
+                        averages_angls = [averages_angls[0], averages_angls[0], averages_angls[1], averages_angls[1]]
+                        averages_colors = [averages_colors[0], averages_colors[0], averages_colors[1], averages_colors[1]]
+
+                        # draw_gradient_line(color_map, point, discrete_line, averages_colors, thickness=2)
+                        # draw_gradient_line(new_angles, point, discrete_line, averages_angls, thickness=1)
+
+                    elif dist_ == 1:
+                        y = [self.resist_thickness-10]
+                        averages_colors = [(self.color_back - 2)]
+                        angles = [np.arctan(y[0]/(dist_*self.pixel_size))]
+                        cv2.line(new_angles, point, nearest_point, np.deg2rad(89), 2)
+                        cv2.line(color_map, point, nearest_point, (np.tan(np.deg2rad(89))*self.pixel_size * 110)/self.resist_thickness, 2)
+                    
+                    if new_angles[point[1], point[0]]  == 0:
+                        self.draw_gradient_line(new_angles, next[0], discrete_line[-1::-1], averages_angls[-1::-1], thickness=2)
+                    if color_map[point[1], point[0]]  == 0:
+                        self.draw_gradient_line(color_map, next[0], discrete_line[-1::-1], averages_colors[-1::-1], thickness=2)
+
+                    cv2.line(width_img, point, nearest_point, dist_, 2)
+
+
+        img_cp = img.copy()
+        mask = img_cp != 128 
+        width_img[mask] = 0
+        new_angles[mask] = 0
+        color_map[img == 0] = self.color_back
+        color_map[img == 255] = self.color_hole
+
+        zeros = np.where((color_map==0) & (img==128))
+        if len(zeros[0]) > 0:
+            tmp = np.zeros_like(img)
+            cv2.drawContours(tmp, [ext[0]], -1, 255, 0)
+            c = self.detect_cont(tmp)
+            ext = np.argwhere(tmp > 0)
+            ext = np.array([list(reversed(ex)) for ex in ext])
+            
+            for i in range(len(zeros[0])):
+                point = (zeros[0][i], zeros[1][i])
+
+                index_int, dist_int = self.closest_point(point, cont_int)
+                index_ext, dist_ext = self.closest_point(point, ext)
+                nearest_point_int = cont_int[index_int]
+                nearest_point_ext = ext[index_ext]
+                discrete_line_int = list(zip(*line(*point, *nearest_point_int)))
+                discrete_line_ext = list(zip(*line(*point, *nearest_point_ext)))
+                distance_int = len(discrete_line_int)
+                distance_ext = len(discrete_line_ext)
+                if distance_int < distance_ext:
+                    val = self.color_back - distance_int*np.tan(new_angles[point[0], point[1]])/(distance_ext + distance_int)
+                else:
+                    val = self.color_hole + distance_ext*np.tan(new_angles[point[0], point[1]])/(distance_ext + distance_int)
+
+                if val == 85.0:
+                    val = (110.0 + 85.0)/2 -random.randint(10, 14)
+                elif val == 110.0:
+                    val = (110.0 + 85.0)/2 -random.randint(10, 14)
+                color_map[point[0], point[1]] = np.abs(val)
+        color_map[img == 0] = 0
+        color_map[img == 255] = 0
+        return width_img, new_angles, color_map
+    
+
+    def transform_radius(self, img, ext, int):
+
+        width_img = np.zeros_like(img, dtype=np.float32)
+        new_angles = np.zeros_like(img, dtype=np.float32)
+        color_map = np.zeros_like(img, dtype=np.float32)
+
+        flag = True
+        for cont_ext, cont_int in zip(ext, int):
+            for point in cont_ext:
+                radius = 1
+                flag = True
+                while flag:
+                    mask = np.zeros_like(img)
+                    mask = cv2.circle(mask, point, radius, 255, -1)
+                    mask = cv2.inRange(mask, 255,255)
+                    cont_mask, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                    mask_cont = np.zeros_like(img)
+                    cv2.drawContours(mask_cont, cont_mask,  -1, 1, 0)
+                    nonzero = np.argwhere(mask_cont > 0)
+                    nonzero = np.array([list(reversed(nonz)) for nonz in nonzero])
+                    intersect = np.array([x for x in set(tuple(x) for x in nonzero) & set(tuple(x) for x in cont_int)])
+                    if len(intersect) != 0:
+                        flag=False
+                    else:
+                        radius += 1
+
+                dist = float('inf')
+                for dot in intersect:
+                    dist_ = np.sqrt((point[0] - dot[0])**2 + (point[1] - dot[1])**2)
+                    if dist_ < dist:
+                        dist = ((np.round(dist_, 0)).astype(np.int32)).item() + 1
+                        nearest_point = dot
+                
+                dist_ = dist - 1
+                discrete_line = list(zip(*line(*point, *nearest_point))) # find all pixels from the line
+                # discrete_line_x = np.array(list(zip(*discrete_line))[0])
+                
+                next = [self.compute_next_pixel(point, nearest_point)]
+
+                if dist_ > 2:
+                    new_line = np.zeros(dist_*self.pixel_size, dtype=np.float32)
+                    x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, 100, self.resist_thickness)
+
+                    x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+
+                    reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                    angles = np.arctan(np.abs(np.gradient(y)))
+                    reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                    averages_angls = np.max(reshaped_angls, axis=1)
+                    max_indices = np.argmax(reshaped_angls, axis=1)
+                    averages_colors = reshaped_colors[np.arange(len(reshaped_colors)), max_indices]
+                
+                    self.draw_gradient_line(color_map, point, discrete_line, averages_colors, thickness=2)
+                    self.draw_gradient_line(new_angles, point, discrete_line, averages_angls, thickness=1)
+                elif dist_ == 2:
+                    new_line = [0] * 2 * self.pixel_size
+                    x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)),0.0, 100, self.resist_thickness)
+                    x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+
+                    angles = np.arctan(np.abs(np.gradient(y)))
+                    reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                    averages_angls = np.max(reshaped_angls, axis=1)
+                    max_indices = np.argmax(reshaped_angls, axis=1)
+                    reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                    averages_colors = reshaped_colors[np.arange(len(reshaped_colors)), max_indices]
+                    averages_angls = [averages_angls[0], averages_angls[0], averages_angls[1], averages_angls[1]]
+                    averages_colors = [averages_colors[0], averages_colors[0], averages_colors[1], averages_colors[1]]
+
+                    self.draw_gradient_line(color_map, point, discrete_line, averages_colors, thickness=2)
+                    self.draw_gradient_line(new_angles, point, discrete_line, averages_angls, thickness=1)
+
+                elif dist_ == 1:
+                    y = [self.resist_thickness-10]
+                    averages_colors = [(self.color_back - 2)]
+                    angles = [np.arctan(y[0]/(dist_*self.pixel_size))]
+                    cv2.line(new_angles, point, nearest_point, np.deg2rad(89), 2)
+                    cv2.line(color_map, point, nearest_point, (np.tan(np.deg2rad(89))*self.pixel_size * 110)/self.resist_thickness, 2)
+
+                cv2.line(width_img, point, nearest_point, dist_, 3)
+
+
+        for cont_ext, cont_int in zip(ext, int):
+            for point in cont_int:
+                radius = 1
+                flag = True
+                while flag:
+                    mask = np.zeros_like(img)
+                    mask = cv2.circle(mask, point, radius, 255, -1)
+                    mask = cv2.inRange(mask, 255,255)
+                    cont_mask, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+                    mask_cont = np.zeros_like(img)
+                    cv2.drawContours(mask_cont, cont_mask,  -1, 1, 0)
+                    nonzero = np.argwhere(mask_cont > 0)
+                    nonzero = np.array([list(reversed(nonz)) for nonz in nonzero])
+                    
+                    intersect = np.array([x for x in set(tuple(x) for x in nonzero) & set(tuple(x) for x in cont_ext)])
+                    if len(intersect) != 0:
+                        flag=False
+                    else:
+                        radius += 1
+
+                dist = float('inf')
+                for dot in intersect:
+                    dist_ = np.sqrt((point[0] - dot[0])**2 + (point[1] - dot[1])**2)
+                    if dist_ < dist:
+                        dist = ((np.round(dist_, 0)).astype(np.int32)).item() + 1
+                        nearest_point = dot
+                dist_ = dist - 1
+                discrete_line = list(zip(*line(*point, *nearest_point))) # find all pixels from the line
+                
+                next = [self.compute_next_pixel(point, nearest_point)]
+
+                if dist_ == 0:
+                    dist_ = 1
+
+                if dist_ > 2:
+                    new_line = np.zeros(dist_*self.pixel_size, dtype=np.float32)
+                    x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, 100, self.resist_thickness)
+                    x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, self.color_hole, self.color_back)
+                    reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                    angles = np.arctan(np.abs(np.gradient(y)))
+                    reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                    averages_angls = np.max(reshaped_angls, axis=1)
+                    max_indices = np.argmax(reshaped_angls, axis=1)
+                    averages_colors = reshaped_colors[np.arange(len(reshaped_colors)), max_indices]
+
+                elif dist_ == 2:
+                    new_line = [0] * 2 * self.pixel_size
+                    x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)),0.0, 100, self.resist_thickness)
+                    x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+                    angles = np.arctan(np.abs(np.gradient(y)))
+                    reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                    averages_angls = np.max(reshaped_angls, axis=1)
+                    max_indices = np.argmax(reshaped_angls, axis=1)
+                    reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+                    averages_colors = reshaped_colors[np.arange(len(reshaped_colors)), max_indices]
+                    averages_angls = [averages_angls[0], averages_angls[0], averages_angls[1], averages_angls[1]]
+                    averages_colors = [averages_colors[0], averages_colors[0], averages_colors[1], averages_colors[1]]
+
+                    # draw_gradient_line(color_map, point, discrete_line, averages_colors, thickness=2)
+                    # draw_gradient_line(new_angles, point, discrete_line, averages_angls, thickness=1)
+
+                elif dist_ == 1:
+                    y = [self.resist_thickness-10]
+                    averages_colors = [(self.color_back - 2)]
+                    angles = [np.arctan(y[0]/(dist_*self.pixel_size))]
+                    cv2.line(new_angles, point, nearest_point, np.deg2rad(89), 2)
+                    cv2.line(color_map, point, nearest_point, (np.tan(np.deg2rad(89))*self.pixel_size * 110)/self.resist_thickness, 2)
+                
+                if new_angles[point[1], point[0]]  == 0:
+                    self.draw_gradient_line(new_angles, next[0], discrete_line[-1::-1], averages_angls[-1::-1], thickness=2)
+                if color_map[point[1], point[0]]  == 0:
+                    self.draw_gradient_line(color_map, next[0], discrete_line[-1::-1], averages_colors[-1::-1], thickness=2)
+
+                cv2.line(width_img, point, nearest_point, dist_, 2)
+
+
+        img_cp = img.copy()
+        mask = img_cp != 128 
+        width_img[mask] = 0
+        new_angles[mask] = 0
+        color_map[img == 0] = self.color_back
+        color_map[img == 255] = self.color_hole
+
+        zeros = np.where((color_map==0) & (img==128))
+        if len(zeros[0]) > 0:
+            tmp = np.zeros_like(img)
+            cv2.drawContours(tmp, [ext[0]], -1, 255, 0)
+            ext = np.argwhere(tmp > 0)
+            ext = np.array([list(reversed(ex)) for ex in ext])
+            
+            for i in range(len(zeros[0])):
+                point = (zeros[0][i], zeros[1][i])
+
+                index_int, dist_int = self.closest_point(point, cont_int)
+                index_ext, dist_ext = self.closest_point(point, ext)
+                nearest_point_int = cont_int[index_int]
+                nearest_point_ext = ext[index_ext]
+                discrete_line_int = list(zip(*line(*point, *nearest_point_int)))
+                discrete_line_ext = list(zip(*line(*point, *nearest_point_ext)))
+                distance_int = len(discrete_line_int)
+                distance_ext = len(discrete_line_ext)
+                if distance_int < distance_ext:
+                    val = self.color_back - distance_int*np.tan(new_angles[point[0], point[1]])/(distance_ext + distance_int)
+                else:
+                    val = self.color_hole + distance_ext*np.tan(new_angles[point[0], point[1]])/(distance_ext + distance_int)
+
+                if val == 85.0:
+                    val = (110.0 + 85.0)/2 -random.randint(10, 14)
+                elif val == 110.0:
+                    val = (110.0 + 85.0)/2 -random.randint(10, 14)
+                color_map[point[0], point[1]] = np.abs(val)
+        color_map[img == 0] = 0
+        color_map[img == 255] = 0
+        return width_img, new_angles, color_map
+    
+
+    def formula_second1(self, img, angles, color_map):
+        signal = np.zeros_like(img, dtype=np.float32)
+        alpha_bord = angles[img == 128]
+        # alpha_bord[alpha_bord==alpha_bord.min()] = np.radians(1)
+        print(alpha_bord.min())
+        alpha_bord[alpha_bord==0.0] = np.radians(1)
+
+        alpha_back = angles[img == 0]
+        alpha_hole = angles[img == 255]
+        signal[img == 0] = (self.k*(1/(np.abs(np.cos(np.radians(alpha_back + 1)))**(0.87)) - 1) + 1) * color_map[img==0]
+
+        signal[img == 128] = (self.k * (1/(np.abs(np.cos(np.radians(90)-(np.radians(180 - 90) - alpha_bord)))**(0.87)) - 1) + 1) *color_map[img==128]
+        signal[img == 255] = (self.k * (1 / (np.abs(np.cos(np.radians(alpha_hole + 1)))**(1.1)) - 1) + 1) * color_map[img==255]
+        signal = np.clip(signal, 0, 255)
+        # signal = cv2.GaussianBlur(signal, (11,11), 0)
+        # signal = cv2.GaussianBlur(signal, (9,9), 0)
+        # cv2.imwrite(f'{save_dir}/{file_name}', signal.astype(np.uint8))
+        return signal
+
+
+
+    def process(self):
+        start_ = time.time()
+
+        for mask in self.masks_list:
+            self.mask_objects.append(self.process_single_image(mask))
+
+
+        print('Processing time: {0} [sec]'.format(time.time() - start_))
+
+            # print(mask_obj.objects[0].hole_contour, mask_obj.objects[0].border_contour)
+
+    # @staticmethod
+    def process_single_image(self, mask):
+        mask_obj = Image(mask)
+        mask_obj.init_contours()
+        for i in range(len(mask_obj.objects)):
+            if mask_obj.objects[i] is not None:
+                # width, new_angles, color_map = self.transform_bezier(mask_obj.mask, [mask_obj.objects[i].border_contour], [mask_obj.objects[i].hole_contour])
+                width, new_angles, color_map = self.transform_radius(mask_obj.mask, [mask_obj.objects[i].border_contour], [mask_obj.objects[i].hole_contour])
+                plt.plot(width[200,:])
+                plt.show()
+                color_map[mask_obj.mask == 0] = self.color_back
+                color_map[mask_obj.mask == 255] = self.color_hole
+                new_angles[mask_obj.mask != 128] = 0.0
+                signal = self.formula_second1(mask_obj.mask, new_angles, color_map)
+
+                nonzero = np.argwhere(signal != 0)
+                for pixel in nonzero:
+                    if mask_obj.mask[pixel[0], pixel[1]] != 0:
+                        mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
+
+                    elif mask_obj.mask[pixel[0], pixel[1]] == 0:
+                        mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
+
+                mask_obj.signal[mask_obj.signal == 0] = np.unique(mask_obj.signal)[1] + 1
+                mask_obj.signal = cv2.GaussianBlur(mask_obj.signal, (11,11), 0)
+                mask_obj.signal = mask_obj.signal.astype(np.uint8)
+        return mask_obj
+
+
+
+    def process_pool(self):
+        start_multi_time_v1 = time.time()
+
+        try:
+            pool = multiprocessing.Pool(processes = self.cpu_count)
+            for mask in pool.map(self.process_single_image, self.masks_list):
+                self.mask_objects.append(mask)
+        finally:
+            pool.close()
+            pool.join()
+        print('Processing time multi v1: {0} [sec]'.format(time.time() - start_multi_time_v1))
+
+
+        
+
+
