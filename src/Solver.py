@@ -1,11 +1,16 @@
 import numpy as np
+import scipy
 import matplotlib.pyplot as plt
 import cv2
 import random
+import torch
 import multiprocessing
 import time
+from functools import lru_cache
 from skimage.draw import line
 from src.ImageClass import *
+
+
 
 class Solver():
     def __init__(self, algo: str, transform_algo: str, pixel_size: int, resist_thickness: int, k: float, masks: list, recalculate: bool,\
