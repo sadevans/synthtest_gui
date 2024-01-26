@@ -19,11 +19,6 @@ from src.PlotsClass import *
 from src.Bezier import *
 
 
-# from src.ImageClass import *
-
-from Bezier import *
-
-
 class Plots(QMainWindow):
     def __init__(self, parent, img_object, flag_figure):
         super().__init__()
