@@ -1,6 +1,13 @@
 import cv2
 import numpy as np
 
+
+class Figure():
+    def __init__(self, hole_contour):
+        self.hole_contour = hole_contour.copy()
+        self.border_width = 0
+        self.border_contour = hole_contour.copy()
+        
 class Image():
     def __init__(self, mask: np.array):
         self.mask = mask
