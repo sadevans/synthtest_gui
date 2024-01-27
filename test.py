@@ -76,16 +76,6 @@ class Plots(QMainWindow):
 
         self.canvas.draw()
 
-
-
-
-
-
-
-
-        
-    
-
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()

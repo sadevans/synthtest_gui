@@ -591,7 +591,6 @@ class Solver():
 
         mask_obj.signal[mask_obj.signal == 0] = np.unique(mask_obj.signal)[1] + 1
         before = mask_obj.signal[mask_obj.mask==128].max()
-        print(before)
         # print(mask_obj.signal[mask_obj.mask==128])
         mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (11,11), 0), 0, 255)
         mask_obj.signal = mask_obj.signal.astype(np.uint8)
