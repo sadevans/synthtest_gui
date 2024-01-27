@@ -6,7 +6,7 @@ from test import *
 
 
 class BezierCurveWidget(QWidget):
-    def __init__(self, parent, border_width:int, pixel_size:int, resist_thickness:int, silicon_thickness:int):
+    def __init__(self, parent, pixel_size:int, resist_thickness:int, silicon_thickness:int):
         super().__init__()
         self.border_width = 3
         self.max_border_width = 50
@@ -36,10 +36,17 @@ class BezierCurveWidget(QWidget):
 
         painter.scale(self.scale_factor, self.scale_factor)
 
+        font = painter.font()
+        font.setPointSize(16)
+        painter.setFont(font)
+
         # Draw control points
         painter.setPen(QPen(Qt.GlobalColor.blue, 8, Qt.PenStyle.SolidLine))
         painter.drawPoint(self.point2)
+        painter.drawText(self.point2 + QPoint(5, -5), "Точка 2")
         painter.drawPoint(self.point3)
+        painter.drawText(self.point3 + QPoint(5, -5), "Точка 3")
+
 
         # Draw bezier curve
         painter.setPen(QPen(Qt.GlobalColor.black, 2, Qt.PenStyle.SolidLine))
@@ -67,7 +74,6 @@ class BezierCurveWidget(QWidget):
 
 
     def mouseMoveEvent(self, event):
-        print('Move')
         if self.dragging_point == 'point2':
             scaled_mouse_pos = event.pos() / self.scale_factor
             self.point2 = scaled_mouse_pos
@@ -84,20 +90,14 @@ class BezierCurveWidget(QWidget):
 
         p3_change_x = self.point3.x()/(self.pixel_size*self.max_border_width)
         p3_change_y = (self.point3.y() - 100)/(self.resist_thickness - 100)
-        print('DP3:', self.parent_.dp3)
-        # print(p3_change_x, p3_change_y)
         self.parent_.dp3 = (p3_change_x, p3_change_y)
-        print(self.parent_.dp3)
 
         p2_change_x = self.point2.x()/(self.pixel_size*self.max_border_width)
         p2_change_y = (self.point2.y() - 100)/(self.resist_thickness - 100)
-        print('DP3:', self.parent_.dp3)
-        # print(p3_change_x, p3_change_y)
         self.parent_.dp2 = (p2_change_x, p2_change_y)
         self.parent_.update_images()
         self.parent_.update_plots()
 
-        print(self.parent_.dp2)
 
 
 def main():

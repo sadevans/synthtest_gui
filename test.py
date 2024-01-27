@@ -7,7 +7,7 @@ matplotlib.use('QtAgg')
 import matplotlib.pyplot as plt
 # from matplotlib.widgets import Cursor
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
-# from matplotlib.figure import Figure
+from matplotlib.figure import Figure
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSlider, QStatusBar
@@ -100,7 +100,7 @@ class MainWindow(QMainWindow):
 
 
         self.radius = 50
-        self.border_width = 50
+        self.border_width = 10
 
         self.resist_thickness = 700
         self.silicon_thickness = 100
@@ -108,8 +108,8 @@ class MainWindow(QMainWindow):
         self.transform_algo = 'bezier'
         self.algo = 'algo1'
         self.k_value = 0.125
-        self.E_value = 500
-        self.signal_formula = 'formula1'
+        self.E_value = 25
+        self.signal_formula = 'formula_k'
         
         self.y = 0
 
@@ -211,8 +211,8 @@ class MainWindow(QMainWindow):
 
         # bezier curve params
         choose_bezier_box = QHBoxLayout()
-        self.label_bezier = QLabel("Выберите расположение полюсов безье\n(для сброса кликнете правой кнопкой мыши)")
-        self.bezier_curve_widget = BezierCurveWidget(self, self.border_width, self.pixel_size, self.resist_thickness, self.silicon_thickness)
+        self.label_bezier = QLabel("Выберите расположение точек 2 и 3 кривой  безье\n(для сброса кликнете правой кнопкой мыши)")
+        self.bezier_curve_widget = BezierCurveWidget(self, self.pixel_size, self.resist_thickness, self.silicon_thickness)
         choose_bezier_box.addWidget(self.label_bezier, alignment= Qt.AlignmentFlag.AlignLeft)
         
         choose_bezier_box.addWidget(self.bezier_curve_widget, alignment= Qt.AlignmentFlag.AlignTop)
@@ -265,39 +265,68 @@ class MainWindow(QMainWindow):
         pixel_size_box.addWidget(self.pixel_size_input, alignment= Qt.AlignmentFlag.AlignCenter)
         vertical_layout_config.addLayout(pixel_size_box)
 
+        
+        formula_signal_box = QHBoxLayout()
+        self.label_formulas_signal = QLabel("Выберите формулу для расчета сигнала")
+
+        formula1 = r'$(k(\frac{1}{\cos^n(\alpha)} - 1) + 1)color$'
+        self.label_formula_signal_k = QLabel()
+        self.render_latex(self.label_formula_signal_k,formula1)
+        self.button_formula_signal_k = QPushButton('Выбрать')
+
+        formula2 = r'$\frac{E}{\cos^n(\alpha)} + color$'
+        self.label_formula_signal_e = QLabel()
+        self.render_latex(self.label_formula_signal_e,formula2)
+        self.button_formula_signal_e = QPushButton('Выбрать')
+
+        self.button_formula_signal_k.clicked.connect(lambda: self.update_signal_formula('formula_k'))
+        self.button_formula_signal_e.clicked.connect(lambda: self.update_signal_formula('formula_e'))
+
+  
+        formula_signal_box.addWidget(self.label_formulas_signal)
+        formula_signal_box.addWidget(self.label_formula_signal_k)
+        formula_signal_box.addWidget(self.button_formula_signal_k)
+
+        formula_signal_box.addWidget(self.label_formula_signal_e)
+        formula_signal_box.addWidget(self.button_formula_signal_e)
+
+
+        vertical_layout_config.addLayout(formula_signal_box)
+        
         vals_4angles_box = QHBoxLayout()
         self.label_k_val = QLabel("Значение k ")
         self.k_val_input = QLineEdit(str(self.k_value))
         self.k_val_input.setFixedWidth(150)
         self.k_val_input.returnPressed.connect(self.change_k_value_enter_press)
-        vals_4angles_box.addWidget(self.label_k_val, alignment= Qt.AlignmentFlag.AlignLeft)
-        vals_4angles_box.addWidget(self.k_val_input, alignment= Qt.AlignmentFlag.AlignCenter)
+        vals_4angles_box.addWidget(self.label_k_val)
+        vals_4angles_box.addWidget(self.k_val_input)
+
+        self.label_e_val = QLabel("Значение E ")
+        self.e_val_input = QLineEdit(str(self.E_value))
+        self.e_val_input.setFixedWidth(150)
+        self.e_val_input.returnPressed.connect(self.change_e_value_enter_press)
+        vals_4angles_box.addWidget(self.label_e_val)
+        vals_4angles_box.addWidget(self.e_val_input)
+
         vertical_layout_config.addLayout(vals_4angles_box)
-
-        
-
-
-        # transform angle algo
-        # choose_transform_algo_box = QHBoxLayout()
-        # self.label_choose_transform_algo_box = QLabel("Алгоритм преобразования углов")
-        # self.button_transform_bezier = QPushButton('Безье')
-        # self.button_transform_parabola = QPushButton('Парабола')
-        # self.button_transform_bezier.clicked.connect(lambda: self.update_algo_transform('bezier'))
-        # self.button_transform_parabola.clicked.connect(lambda: self.update_algo_transform('parabola'))
-        # choose_transform_algo_box.addWidget(self.label_choose_transform_algo_box, alignment= Qt.AlignmentFlag.AlignLeft)
-        # choose_transform_algo_box.addWidget(self.button_transform_bezier, alignment= Qt.AlignmentFlag.AlignCenter)
-        # choose_transform_algo_box.addWidget(self.button_transform_parabola, alignment= Qt.AlignmentFlag.AlignRight)
-        # vertical_layout_config.addLayout(choose_transform_algo_box)
-
 
         horizontal_layout_imgs.addLayout(vertical_layout_config)
         self.layout.addLayout(horizontal_layout_imgs)
 
 
+    def render_latex(self, label, latex_formula):
+        figure = Figure(figsize=(2, 0.4))
+        canvas = FigureCanvas(figure)
+        figure.text(0.0, 0.4, latex_formula, fontsize=12)
+
+        canvas.draw()
+        pixmap = canvas.grab()
+        label.setPixmap(pixmap)
+
+
     def show_plots_circle(self):
         self.plots_circle_ = Plots(self, self.solv.mask_objects[0], flag_figure='circle')
         self.plots_circle_.show()
-        print('plots for circle')
 
     def show_plots_square(self):
         self.plots_square_ = Plots(self, self.solv.mask_objects[1], flag_figure='square')
@@ -389,7 +418,21 @@ class MainWindow(QMainWindow):
     
     def change_k_value_enter_press(self):
         text = self.k_val_input.text()
-        self.k_val = float(text)
+        self.k_value = float(text)
+        self.update_images(flag_draw=False, flag_recalculate=False)
+        self.update_plots()
+
+    
+    def change_e_value_enter_press(self):
+        text = self.e_val_input.text()
+        self.E_value = float(text)
+        self.update_images(flag_draw=False, flag_recalculate=False)
+        self.update_plots()
+
+
+
+    def update_signal_formula(self, value):
+        self.signal_formula = value
         self.update_images(flag_draw=False, flag_recalculate=False)
         self.update_plots()
 
@@ -417,31 +460,32 @@ class MainWindow(QMainWindow):
             self.square_image = self.generate_square_image()
         
         if not flag_recalculate:
-            self.solv.k = self.k_val
-            self.solv.mask_objects[0].signal = self.solv.formula_second1(self.solv.mask_objects[0].mask, self.solv.mask_objects[0].angles_map, self.solv.mask_objects[0].color_map).astype(np.uint8)
-            self.solv.mask_objects[1].signal = self.solv.formula_second1(self.solv.mask_objects[1].mask, self.solv.mask_objects[1].angles_map, self.solv.mask_objects[1].color_map).astype(np.uint8)
+            if self.signal_formula == 'formula_k':
+                self.solv.signal_formula = self.signal_formula
+                self.solv.k = self.k_value
+                self.solv.mask_objects[0].signal = self.solv.GetSignal(self.solv.mask_objects[0])
+                self.solv.mask_objects[1].signal = self.solv.GetSignal(self.solv.mask_objects[1])
+                # self.solv.mask_objects[0].signal = self.solv.GetSignalk(self.solv.mask_objects[0].mask, self.solv.mask_objects[0].angles_map, self.solv.mask_objects[0].color_map).astype(np.uint8)
+                # self.solv.mask_objects[1].signal = self.solv.GetSignalk(self.solv.mask_objects[1].mask, self.solv.mask_objects[1].angles_map, self.solv.mask_objects[1].color_map).astype(np.uint8)
+            elif self.signal_formula == 'formula_e':
+                self.solv.signal_formula = self.signal_formula
+                self.solv.E = self.E_value
+                self.solv.mask_objects[0].signal = self.solv.GetSignal(self.solv.mask_objects[0])
+                self.solv.mask_objects[1].signal = self.solv.GetSignal(self.solv.mask_objects[1])
+                # self.solv.mask_objects[0].signal = self.solv.GetSignalE(self.solv.mask_objects[0].mask, self.solv.mask_objects[0].angles_map, self.solv.mask_objects[0].color_map).astype(np.uint8)
+                # self.solv.mask_objects[1].signal = self.solv.GetSignalE(self.solv.mask_objects[1].mask, self.solv.mask_objects[1].angles_map, self.solv.mask_objects[1].color_map).astype(np.uint8)
         else:
-            self.solv = Solver(algo=self.algo, transform_algo = self.transform_algo, pixel_size=self.pixel_size, \
-                      resist_thickness=self.resist_thickness, k=self.k_value, masks = [self.circle_image, self.square_image],\
+            self.solv = Solver(algo=self.algo, signal_formula = self.signal_formula, pixel_size=self.pixel_size, \
+                      resist_thickness=self.resist_thickness, k=self.k_value, E=self.E_value, masks = [self.circle_image, self.square_image],\
                         recalculate=flag_recalculate, dp2=self.dp2, dp3=self.dp3)
 
 
         self.circle_signal = self.solv.mask_objects[0].signal
         self.square_signal = self.solv.mask_objects[1].signal
 
-        # cv2.imwrite('./circle_signal.png', self.solv.mask_objects[0].signal)
-        # cv2.imwrite('./square_signal.png', self.solv.mask_objects[1].signal)
-
-
         self.mask_label_1.setPixmap(self.convert_ndarray_to_pixmap(self.solv.mask_objects[0].signal))
         self.mask_label_2.setPixmap(self.convert_ndarray_to_pixmap(self.solv.mask_objects[1].signal))
 
-
-
-        # self.mask_label_1.setPixmap(self.convert_ndarray_to_pixmap(circle_image))
-
-        # square_image = self.generate_square_image()
-        # self.mask_label_2.setPixmap(self.convert_ndarray_to_pixmap(square_image))
 
 
     # def update_icons(self):
@@ -479,20 +523,6 @@ class MainWindow(QMainWindow):
 
             self.ax_square.grid()
             self.canvas_square.draw()
-
-    # def update_plot_circle(self, flag='horizontally'):
-    #     self.ax_circle.cla()
-    #     # self.ax_circle.plot(self.circle_image[self.slice_y1, :])
-    #     if flag=='horizontally' and flag_label<2:
-    #         self.ax_circle.plot(self.circle_signal[self.label1_slice_y1, :])
-    #         self.ax_circle.set_title(f'Срез по y = {self.label1_slice_y1} круга')
-    #     elif flag=='vertically'and flag_label<2:
-    #         self.ax_circle.plot(self.circle_signal[:, self.label1_slice_x1])
-    #         self.ax_circle.set_title(f'Срез по x = {self.label1_slice_x1} круга')
-    #     self.ax_circle.grid()
-    #     self.canvas_circle.draw()
-
-    #     self.ax_square.cla()
 
 
     def generate_circle_image(self):

@@ -13,10 +13,10 @@ from src.ImageClass import *
 
 
 class Solver():
-    def __init__(self, algo: str, transform_algo: str, pixel_size: int, resist_thickness: int, k: float, masks: list, recalculate: bool,\
+    def __init__(self, algo: str, signal_formula: str, pixel_size: int, resist_thickness: int, k: float, E: float, masks: list, recalculate: bool,\
                  dp2:tuple, dp3:tuple):
         self.algo = algo
-        self.transform_algo = transform_algo
+        self.signal_formula = signal_formula
         self.pixel_size = pixel_size
         self.resist_thickness = resist_thickness
 
@@ -26,6 +26,7 @@ class Solver():
         self.color_back = 110
         self.color_hole = 85
         self.k = k
+        self.E = E
         self.recalculate = recalculate
 
         self.dp2 = dp2
@@ -33,8 +34,6 @@ class Solver():
 
         self.i = 0
 
-        # if self.transform_algo == 'bezier':
-        #     self.transform_func = np.vectorize(self.transform_bezier)
 
         self.cpu_count = multiprocessing.cpu_count()
         # self.process()
@@ -456,30 +455,47 @@ class Solver():
         return width_img, new_angles, color_map
     
 
-    def formula_second1(self, img, angles, color_map):
+    def GetSignalk(self, img, angles, color_map):
         signal = np.zeros_like(img, dtype=np.float32)
-        alpha_bord = angles[img == 128]
+        alpha_bord = angles[img == 128].copy()
         # alpha_bord[alpha_bord==alpha_bord.min()] = np.radians(1)
         # print(alpha_bord.max(), color_map[angles==alpha_bord.max()])
         alpha_bord[alpha_bord==0.0] = np.radians(1)
 
-        alpha_back = angles[img == 0]
-        alpha_hole = angles[img == 255]
+        alpha_back = angles[img == 0].copy()
+        alpha_hole = angles[img == 255].copy()
         signal[img == 0] = (self.k*(1/(np.abs(np.cos(np.radians(alpha_back + 1)))**(0.87)) - 1) + 1) * color_map[img==0]
 
         # signal[img == 128] = (self.k * (1/(np.abs(np.cos(np.radians(90)-(np.radians(180 - 90) - alpha_bord)))**(0.87)) - 1) + 1) *color_map[img==128]
         signal[img == 128] = (self.k * (1/(np.abs(np.cos((alpha_bord)))**(0.87)) - 1) + 1) *color_map[img==128]
         
         signal[img == 255] = (self.k * (1 / (np.abs(np.cos(np.radians(alpha_hole + 1)))**(1.1)) - 1) + 1) * color_map[img==255]
-        # print(signal[img==128])
 
-        # print(signal[img==])
         signal = np.clip(signal, 0, 255)
 
-        # print(signal[img == 128])
         # signal = cv2.GaussianBlur(signal, (11,11), 0)
         # signal = cv2.GaussianBlur(signal, (9,9), 0)
-        # cv2.imwrite(f'{save_dir}/{file_name}', signal.astype(np.uint8))
+        return signal
+    
+
+    def GetSignalE(self, img, angles, color_map):
+        signal = np.zeros_like(img, dtype=np.float32)
+
+        alpha_bord = angles[img == 128].copy()
+        alpha_bord[alpha_bord==alpha_bord.min()] = np.radians(1)
+
+        alpha_back = angles[img == 0].copy()
+        alpha_hole = angles[img == 255].copy()
+
+        signal[img == 0] =  (self.E / (np.abs(np.cos(np.radians(alpha_back + 1)))**(0.87))) + color_map[img==0]
+
+        # signal[crop == 128] = E / np.cos(np.radians(90)-(np.radians(180 - 90) - alpha_bord))**(0.87) + 120
+        # signal[crop == 128] = E / np.abs(np.cos(np.radians(90) - alpha_bord))**(0.87) + color_map[crop==128]
+        signal[img == 128] = (self.E / (np.abs(np.cos(np.radians(90) - (np.radians(180 - 90) - alpha_bord)))**(0.87))) + color_map[img==128]
+        # signal[crop == 255] = E / np.cos(alpha_hole + 1)**(1.1) + 60
+        signal[img == 255] = (self.E / (np.abs(np.cos(np.radians(alpha_hole + 1)))**(1.1))) + color_map[img==255]
+
+        signal = np.clip(signal, 0, 255)
         return signal
 
 
@@ -505,31 +521,33 @@ class Solver():
                     mask_obj.width_map, mask_obj.angles_map, mask_obj.color_map = self.transform_bezier(mask_obj.mask, [mask_obj.objects[i].border_contour], [mask_obj.objects[i].hole_contour])
                 elif self.algo == 'algo2': 
                     mask_obj.width_map, mask_obj.angles_map, mask_obj.color_map = self.transform_radius(mask_obj.mask, [mask_obj.objects[i].border_contour], [mask_obj.objects[i].hole_contour])
-                # plt.imshow(new_angles)
-                # plt.show()
-                # plt.imshow(color_map)
-                # plt.show()
-                # plt.plot(new_angles[200,:])
-                # plt.show()
-            
+
                 mask_obj.color_map[mask_obj.mask == 0] = self.color_back
                 mask_obj.color_map[mask_obj.mask == 255] = self.color_hole
                 mask_obj.angles_map[mask_obj.mask != 128] = 0.0
-                signal = self.formula_second1(mask_obj.mask, mask_obj.angles_map, mask_obj.color_map)
 
-                nonzero = np.argwhere(signal != 0)
-                for pixel in nonzero:
-                    if mask_obj.mask[pixel[0], pixel[1]] != 0:
-                        mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
+                mask_obj.signal = self.GetSignal(mask_obj).copy()
 
-                    elif mask_obj.mask[pixel[0], pixel[1]] == 0:
-                        mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
+                # was start
+                # if self.signal_formula == 'formula_k' : signal = self.GetSignalk(mask_obj.mask, mask_obj.angles_map, mask_obj.color_map)
+                # elif self.signal_formula == 'formula_e' : signal = self.GetSignalE(mask_obj.mask, mask_obj.angles_map, mask_obj.color_map)
 
-                mask_obj.signal[mask_obj.signal == 0] = np.unique(mask_obj.signal)[1] + 1
-                before = mask_obj.signal[mask_obj.mask==128].max()
-                print(before)
+
+                # nonzero = np.argwhere(signal != 0)
+                # for pixel in nonzero:
+                #     if mask_obj.mask[pixel[0], pixel[1]] != 0:
+                #         mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
+
+                #     elif mask_obj.mask[pixel[0], pixel[1]] == 0:
+                #         mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
+
+                # mask_obj.signal[mask_obj.signal == 0] = np.unique(mask_obj.signal)[1] + 1
+                # before = mask_obj.signal[mask_obj.mask==128].max()
+                # print(before)
+                # was end
+
                 # print(mask_obj.signal[mask_obj.mask==128])
-                mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (11,11), 0), 0, 255)
+                # mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (11,11), 0), 0, 255)    #was
                 # mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (5,5), 0), 0, 255)
                 # mask_obj.signal = cv2.bilateralFilter(mask_obj.signal, d=9, sigmaColor=75, sigmaSpace=75)
                 # mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (7,7), 0), 0, 255)
@@ -546,31 +564,40 @@ class Solver():
                 # mask_obj.signal = np.clip(cv2.sepFilter2D(mask_obj.signal, -1, kernel, kernel), 0, 255)
                 # mask_obj.signal = np.clip(cv2.adaptiveBlur(mask_obj.signal, (15, 15), 0), 0, 255)
 
-
-                
-
-
-
-                # print(np.unique(mask_obj.signal[mask_obj.mask==128]), np.unique(mask_obj.signal[mask_obj.mask==255]))
-
                 # mask_obj.signal = cv2.bilateralFilter(mask_obj.signal, d=11, sigmaColor=81, sigmaSpace=81)
                 # mask_obj.signal = cv2.GaussianBlur(mask_obj.signal, (3,3), 0)
 
                 # mask_obj.signal = cv2.medianBlur(mask_obj.signal, 3)
                 # mask_obj.signal = cv2.GaussianBlur(mask_obj.signal, (11,11), 0)
-                after = mask_obj.signal[mask_obj.mask==128].max()
+                # after = mask_obj.signal[mask_obj.mask==128].max()     #was
                 # mask_obj.signal[width==2] = mask_obj.signal[width==2]*(1.2)
                 # mask_obj.signal[width==1] = mask_obj.signal[width==1]*(1.3)
-
-                # mask_obj.signal = cv2.convertScaleAbs(mask_obj.signal[width==2], alpha=1.1, beta=0)
-
-
-                # print(mask_obj.signal[mask_obj.mask==128])
-                # mask_obj.signal = np.clip(mask_obj.signal, 0, 255)
-                mask_obj.signal = mask_obj.signal.astype(np.uint8)
-                # signal = np.clip(signal, 0, 255)
+                # mask_obj.signal = mask_obj.signal.astype(np.uint8)    #was
         return mask_obj
 
+
+    def GetSignal(self, mask_obj):
+        if self.signal_formula == 'formula_k' : signal = self.GetSignalk(mask_obj.mask, mask_obj.angles_map, mask_obj.color_map)
+        elif self.signal_formula == 'formula_e' : signal = self.GetSignalE(mask_obj.mask, mask_obj.angles_map, mask_obj.color_map)
+
+
+        nonzero = np.argwhere(signal != 0)
+        for pixel in nonzero:
+            if mask_obj.mask[pixel[0], pixel[1]] != 0:
+                mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
+
+            elif mask_obj.mask[pixel[0], pixel[1]] == 0:
+                mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
+
+        mask_obj.signal[mask_obj.signal == 0] = np.unique(mask_obj.signal)[1] + 1
+        before = mask_obj.signal[mask_obj.mask==128].max()
+        print(before)
+        # print(mask_obj.signal[mask_obj.mask==128])
+        mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (11,11), 0), 0, 255)
+        mask_obj.signal = mask_obj.signal.astype(np.uint8)
+
+
+        return mask_obj.signal
 
 
     def process_pool(self):

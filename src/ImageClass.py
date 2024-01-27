@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 
-class Figure():
+class FigureClass():
     def __init__(self, hole_contour):
         self.hole_contour = hole_contour.copy()
         self.border_width = 0
@@ -43,6 +43,6 @@ class Image():
                 set_border = set(map(tuple, np.argwhere(temp_bord==128)))
                 set_hole = set(map(tuple, np.argwhere(temp_hole==255)))
                 if set_hole.issubset(set_border):
-                    obj = Figure(c_int_[j].reshape(-1, 2)) # создаем объекты класса Figure
+                    obj = FigureClass(c_int_[j].reshape(-1, 2)) # создаем объекты класса FigureClass
                     obj.border_contour = c_ext_[i].reshape(-1, 2).copy()
                     self.objects.append(obj)
