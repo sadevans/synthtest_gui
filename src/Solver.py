@@ -88,42 +88,22 @@ class Solver():
         return cont
     
     # @lru_cache
-    def bezier(self, line, t, prev, color_hole, color_back):
+    def bezier(self, line, t, prev, color_back, color_hole):
         if prev == 0.0:
             point1 = (0, color_back)
             point4 = (len(line), color_hole)
-            # eq = lambda point: ((point - point1[0])/(point4[0] - point1[0]))*(point4[1] - point1[1]) + point1[1]
-            # x3 = random.randint(0, len(line)-1)
-            # y3 = random.uniform(self.color_hole, eq(x3))
-            # point3 = (0, color_hole)
-            # point3 = (self.dp3[0]*len(line), self.dp3[1]*(color_back - color_hole) + color_hole)
-            point3 = (self.dp3[0]*len(line), self.dp3[1]*(color_hole - color_back) + color_back)
-            # x2 = random.randint(1, len(line))
-            # y2 = random.uniform(eq(x2)+1,self.color_back)
-            # print(
-            # point2 = (len(line), color_back)
-            # point2 = (self.dp2[0]*len(line), self.dp2[1]*(color_back - color_hole) + color_hole)
-            point2 = (self.dp2[0]*len(line), self.dp2[1]*(color_hole - color_back) + color_back)
-
-            # while self.i < 5:
-
-            #     print('POINTS:', point2, point3)
-            #     self.i += 1
+            point2 = (self.dp3[0]*len(line), self.dp3[1]*(color_back - color_hole) + color_hole) # default: (len(line), color_back)
+            # point3 = (self.dp3[0]*len(line), self.dp3[1]*(np.abs(color_hole - color_back)) - color_back)
+            point3 = (self.dp2[0]*len(line), self.dp2[1]*(color_back - color_hole) + color_hole) #default: (0, color_hole)
+            # point2 = (self.dp2[0]*len(line), self.dp2[1]*(np.abs(color_hole - color_back)) - color_back)
 
         if prev == 255.0:
             point1 = (0, color_hole)
             point4 = (len(line), color_back)
-            # eq = lambda point: ((point - point1[0])/(point4[0] - point1[0]))*(point4[1] - point1[1]) + point1[1]
-            # x3 = random.randint(0, len(line)-1)
-            # y3 = random.uniform(eq(x3), self.color_back+1)
-            # point3 = (0, color_back)
-            point3 = (self.dp3[0]*len(line), self.dp3[1]*(color_back - color_hole) + color_hole)
-            # x2 = random.randint(1, len(line))
-            # y2 = random.uniform(self.color_hole, eq(x2))
-            # point2 = (len(line), color_hole)
-            point2 = (self.dp2[0]*len(line), self.dp2[1]*(color_back - color_hole) + color_hole)
-           
-
+            point3 = (self.dp3[0]*len(line), self.dp3[1]*(color_back - color_hole) + color_hole) # dafault: (0, color_back)
+            # point3 = (self.dp3[0]*len(line), self.dp3[1]*(color_hole - color_back) + color_back)
+            point2 = (self.dp2[0]*len(line), self.dp2[1]*(color_back - color_hole) + color_hole) # default: (len(line), color_hole)
+            # point2 = (self.dp2[0]*len(line), self.dp2[1]*(color_hole - color_back) + color_back)
         x = point1[0]*(1-t)**3 + point2[0]*3*t*(1-t)**2 + point3[0]*3*t**2*(1-t) + point4[0]*t**3
         vals = point1[1]*(1-t)**3 + point2[1]*3*t*(1-t)**2 + point3[1]*3*t**2*(1-t) + point4[1]*t**3
         return x, vals
@@ -147,9 +127,12 @@ class Solver():
 
                     if dist_ > 1:
                         new_line = np.zeros(dist_*self.pixel_size, dtype=np.float32)
-                        x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, 100, self.resist_thickness)
+                        # x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, 100, self.resist_thickness)
+                        x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.resist_thickness, 100)
 
-                        x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+                        # x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+                        x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_back, self.color_hole)
+
                         reshaped_y  = np.array(y).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
                         averages_y = np.max(reshaped_y, axis=1)
 
@@ -193,8 +176,12 @@ class Solver():
 
                     if dist_ > 1:
                         new_line = np.zeros(dist_*self.pixel_size, dtype=np.float32)
-                        x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, 100, self.resist_thickness)
-                        x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, self.color_hole, self.color_back)
+                        # x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, 100, self.resist_thickness)
+                        x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, self.resist_thickness, 100)
+
+                        # x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, self.color_hole, self.color_back)
+                        x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 255.0, self.color_back, self.color_hole)
+                        
                         reshaped_y  = np.array(y).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
                         averages_y = np.max(reshaped_y, axis=1)
                         reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
@@ -214,12 +201,16 @@ class Solver():
                         cv2.line(color_map, point, nearest_point, (np.tan(np.deg2rad(89))*self.pixel_size * 110)/self.resist_thickness, 2)
                     
                     if new_angles[point[1], point[0]]  == 0:
-                        self.draw_gradient_line(new_angles, next[0], discrete_line[-1::-1], averages_angls[-1::-1], thickness=2)
+                        # self.draw_gradient_line(new_angles, next[0], discrete_line[-1::-1], averages_angls[-1::-1], thickness=2)
+                        self.draw_gradient_line(new_angles, point, discrete_line[-1::-1], averages_angls[-1::-1], thickness=2)
+                        # self.draw_gradient_line(new_angles, next[0], discrete_line, averages_angls, thickness=2)
+                        # self.draw_gradient_line(new_angles, point, discrete_line, averages_angls, thickness=2)
+
                     if color_map[point[1], point[0]]  == 0:
-
-                        self.draw_gradient_line(color_map, next[0], discrete_line[-1::-1], averages_colors[-1::-1], thickness=2)
+                        # self.draw_gradient_line(color_map, next[0], discrete_line[-1::-1], averages_colors[-1::-1], thickness=2)
+                        self.draw_gradient_line(color_map, point, discrete_line[-1::-1], averages_colors[-1::-1], thickness=2)
                         # self.draw_gradient_line(color_map, next[0], discrete_line, averages_colors, thickness=1)
-
+                        # self.draw_gradient_line(color_map, point, discrete_line, averages_colors, thickness=1)
 
                     cv2.line(width_img, point, nearest_point, dist_, 2)
 
@@ -321,8 +312,8 @@ class Solver():
                     self.draw_gradient_line(new_angles, point, discrete_line, averages_angls, thickness=1)
                 elif dist_ == 2:
                     new_line = [0] * 2 * self.pixel_size
-                    x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)),0.0, 100, self.resist_thickness)
-                    x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+                    x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)),0.0, self.resist_thickness, 100)
+                    x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_back, self.color_hole)
 
                     angles = np.arctan(np.abs(np.gradient(y)))
                     reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
@@ -393,8 +384,8 @@ class Solver():
 
                 elif dist_ == 2:
                     new_line = [0] * 2 * self.pixel_size
-                    x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)),0.0, 100, self.resist_thickness)
-                    x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+                    x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)),0.0, self.resist_thickness, 100)
+                    x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_back, self.color_hole)
                     angles = np.arctan(np.abs(np.gradient(y)))
                     reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
                     averages_angls = np.max(reshaped_angls, axis=1)
@@ -415,9 +406,12 @@ class Solver():
                     cv2.line(color_map, point, nearest_point, (np.tan(np.deg2rad(89))*self.pixel_size * 110)/self.resist_thickness, 2)
                 
                 if new_angles[point[1], point[0]]  == 0:
-                    self.draw_gradient_line(new_angles, next[0], discrete_line[-1::-1], averages_angls[-1::-1], thickness=2)
+                    # self.draw_gradient_line(new_angles, next[0], discrete_line[-1::-1], averages_angls[-1::-1], thickness=2)
+                    self.draw_gradient_line(new_angles, point, discrete_line[-1::-1], averages_angls[-1::-1], thickness=2)
+
                 if color_map[point[1], point[0]]  == 0:
-                    self.draw_gradient_line(color_map, next[0], discrete_line[-1::-1], averages_colors[-1::-1], thickness=2)
+                    # self.draw_gradient_line(color_map, next[0], discrete_line[-1::-1], averages_colors[-1::-1], thickness=2)
+                    self.draw_gradient_line(color_map, point, discrete_line[-1::-1], averages_colors[-1::-1], thickness=2)
 
                 cv2.line(width_img, point, nearest_point, dist_, 2)
 
