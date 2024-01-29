@@ -2,7 +2,7 @@ import sys
 from PyQt6.QtWidgets import QApplication, QWidget
 from PyQt6.QtGui import QPainter, QPen
 from PyQt6.QtCore import Qt, QPoint
-from test import *
+from run import *
 
 
 class BezierCurveWidget(QWidget):
