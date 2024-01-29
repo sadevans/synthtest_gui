@@ -24,3 +24,6 @@ source venv/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
+
+## Использование GUI
+Все параметры в конфигураторе изменяемы.
