@@ -573,7 +573,7 @@ class Solver():
             mask_obj.signal[mask_obj.width_map == 1] = np.clip(signal_3px.max() * 1.5,0,255)
 
         mask_obj.signal = mask_obj.signal.astype(np.uint8)
-        print('MAX VALUE: ', mask_obj.signal.max())
+        # print('MAX VALUE: ', mask_obj.signal.max())
 
         return mask_obj.signal
 

@@ -203,7 +203,6 @@ class MainWindow(QMainWindow):
         self.label_bezier = QLabel("Выберите расположение точек 2 и 3 кривой  безье\n(для сброса кликнете правой кнопкой мыши)")
         self.bezier_curve_widget = BezierCurveWidget(self, self.pixel_size, self.resist_thickness, self.silicon_thickness)
         choose_bezier_box.addWidget(self.label_bezier, alignment= Qt.AlignmentFlag.AlignLeft)
-        
         choose_bezier_box.addWidget(self.bezier_curve_widget, alignment= Qt.AlignmentFlag.AlignTop)
         vertical_layout_config.addLayout(choose_bezier_box)
 
