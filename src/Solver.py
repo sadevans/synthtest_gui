@@ -545,7 +545,7 @@ class Solver():
         # after = mask_obj.signal[mask_obj.mask==128]
         after = mask_obj.signal[mask_obj.width_map < 3]
 
-        if 1 in mask_obj.width_map or 2 in mask_obj.width_map:
+        if 1 in mask_obj.width_map or 2 in mask_obj.width_map or 3 in mask_obj.width_map:
             new_line = np.zeros(3*self.pixel_size, dtype=np.float32)
             x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, 100, self.resist_thickness)
             x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
@@ -560,21 +560,16 @@ class Solver():
                                                                                     + list(averages_colors) + [self.color_hole,self.color_hole,self.color_hole]))
             signal_3px = signal_3px * after.max()/before.max()
 
-        if 3 in mask_obj.width_map and 4 in mask_obj.width_map:
+        elif 2 in mask_obj.width_map:
+            if 1 in mask_obj.width_map:
+                mask_obj.signal[mask_obj.width_map == 1] = np.clip(signal_3px.max() * 1.2,0,255)
+                mask_obj.signal[mask_obj.width_map == 2] = np.clip(signal_3px.max() * 1.15,0,255)
 
-            mask_obj.signal[mask_obj.width_map > 0 ] = mask_obj.signal[mask_obj.width_map > 0] * 0.9
-            mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (3,3), 0), 0, 255)
-
-        if 2 in mask_obj.width_map and 3 not in mask_obj.width_map:
-            mask_obj.signal[mask_obj.width_map == 2] = np.clip(signal_3px.max() * 1.1,0,255)
-            mask_obj.signal[mask_obj.width_map == 1] = np.clip(signal_3px.max() * 1.2,0,255)
         elif 1 in mask_obj.width_map:
             mask_obj.signal[mask_obj.width_map == 2] = np.clip(signal_3px.max() * 1.3,0,255)
             mask_obj.signal[mask_obj.width_map == 1] = np.clip(signal_3px.max() * 1.5,0,255)
 
         mask_obj.signal = mask_obj.signal.astype(np.uint8)
-        # print('MAX VALUE: ', mask_obj.signal.max())
-
         return mask_obj.signal
 
 

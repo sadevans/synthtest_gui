@@ -525,7 +525,7 @@ class MainWindow(QMainWindow):
             cv2.circle(self.circle_image, center, self.radius, 255, -1)
             cont, _ = cv2.findContours(self.circle_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
             self.circle_image = 255*np.zeros((self.mask_w, self.mask_h), dtype=np.uint8) # blank image
-            cv2.drawContours(self.circle_image, cont, 0, 128, 2)
+            cv2.drawContours(self.circle_image, cont, 0, 128, self.border_width*2)
             cv2.circle(self.circle_image, center, self.radius, 255, 2)
             cv2.circle(self.circle_image, center, self.radius, 255, -1)
         else:
@@ -541,11 +541,19 @@ class MainWindow(QMainWindow):
         self.square_image = 255*np.zeros((self.mask_w, self.mask_h), dtype=np.uint8) # blank image
         center = (self.mask_w//2, self.mask_h//2)
     
-        self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius + self.border_width), center[1]-(self.radius + self.border_width)), 
-                  (center[0] + (self.radius + self.border_width), center[1]+ (self.radius + self.border_width)), 128, 20) 
-        self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius + self.border_width), center[1]-(self.radius + self.border_width)), 
-                  (center[0] + (self.radius + self.border_width), center[1]+ (self.radius + self.border_width)), 128, -1)
+        # self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius + self.border_width), center[1]-(self.radius + self.border_width)), 
+        #           (center[0] + (self.radius + self.border_width), center[1]+ (self.radius + self.border_width)), 128, 20) 
+        # self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius + self.border_width), center[1]-(self.radius + self.border_width)), 
+        #           (center[0] + (self.radius + self.border_width), center[1]+ (self.radius + self.border_width)), 128, -1)
 
+        self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius), center[1]-(self.radius)), 
+                  (center[0] + (self.radius), center[1]+ (self.radius)), 255, 20) 
+        self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius), center[1]-(self.radius)), 
+                  (center[0] + (self.radius), center[1]+ (self.radius)), 255, -1)
+        # added
+        cont, _ = cv2.findContours(self.square_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+        self.square_image = 255*np.zeros((self.mask_w, self.mask_h), dtype=np.uint8) # blank image
+        cv2.drawContours(self.square_image, cont, 0, 128, self.border_width*2)
         self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius), center[1]-(self.radius)), 
                   (center[0] + (self.radius), center[1]+ (self.radius)), 255, 20) 
         self.square_image = cv2.rectangle(self.square_image, (center[0] - (self.radius), center[1]-(self.radius)), 
