@@ -1,17 +1,11 @@
 import numpy as np
-import scipy
 import matplotlib.pyplot as plt
 import cv2
 import random
-import torch
 import multiprocessing
 import time
-from functools import lru_cache
 from skimage.draw import line
 from src.ImageClass import *
-from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication
-
 
 
 class Solver():

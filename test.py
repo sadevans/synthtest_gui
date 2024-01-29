@@ -5,13 +5,12 @@ import matplotlib
 matplotlib.use('QtAgg')
 
 import matplotlib.pyplot as plt
-# from matplotlib.widgets import Cursor
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas, NavigationToolbar2QT as NavigationToolbar
 from matplotlib.figure import Figure
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSlider, QStatusBar
-from PyQt6.QtGui import QPixmap, QImage, QPen, QColor, QPainter, QCursor
+from PyQt6.QtWidgets import QApplication, QMainWindow, QLabel, QVBoxLayout, QHBoxLayout, QWidget, QPushButton, QLineEdit, QSlider
+from PyQt6.QtGui import QPixmap, QImage, QCursor
 from PyQt6.QtCore import Qt
 
 from src.Solver import *

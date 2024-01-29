@@ -1,0 +1,8 @@
+matplotlib==3.7.0
+numpy==1.23.5
+opencv_python==4.8.0.76
+PyQt6==6.6.1
+PyQt6_sip==13.5.2
+PyQt6_sip==13.6.0
+scikit_image==0.19.3
+scipy==1.10.0
