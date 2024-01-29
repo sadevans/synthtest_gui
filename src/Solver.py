@@ -478,32 +478,7 @@ class Solver():
 
         # signal = cv2.GaussianBlur(signal, (11,11), 0)
         # signal = cv2.GaussianBlur(signal, (9,9), 0)
-        return signal
-    
-
-    # def GetSignalk(self, img, angles, color_map):
-    #     signal = np.zeros_like(img, dtype=np.float32)
-    #     alpha_bord = angles[img == 128].copy()
-    #     # alpha_bord[alpha_bord==alpha_bord.min()] = np.radians(1)
-    #     # print(alpha_bord.max(), color_map[angles==alpha_bord.max()])
-    #     alpha_bord[alpha_bord==0.0] = np.radians(1)
-
-    #     alpha_back = angles[img == 0].copy()
-    #     # print('ALPHA BACK: ', alpha_back)
-    #     alpha_hole = angles[img == 255].copy()
-    #     signal[img == 0] = (self.k*(1/(np.abs(np.cos(np.radians(alpha_back)))**(0.87)))+1) * color_map[img==0]
-
-    #     # signal[img == 128] = (self.k * (1/(np.abs(np.cos(np.radians(90)-(np.radians(180 - 90) - alpha_bord)))**(0.87)) - 1) + 1) *color_map[img==128]
-    #     signal[img == 128] = (self.k * (1/(np.abs(np.cos((alpha_bord)))**(1.1)))+1) *color_map[img==128]
-        
-    #     signal[img == 255] = (self.k * (1 / (np.abs(np.cos(np.radians(alpha_hole)))**(1.1)))+1) * color_map[img==255]
-
-    #     signal = np.clip(signal, 0, 255)
-
-    #     # signal = cv2.GaussianBlur(signal, (11,11), 0)
-    #     # signal = cv2.GaussianBlur(signal, (9,9), 0)
-    #     return signal
-    
+        return signal  
 
     def GetSignalE(self, img, angles, color_map):
         signal = np.zeros_like(img, dtype=np.float32)
@@ -590,15 +565,12 @@ class Solver():
             signal_3px = self.GetSignalk(mask_3px, np.array([0,0,0] + list(averages_angls) + [0,0,0]), np.array([self.color_back,self.color_back,self.color_back] \
                                                                                     + list(averages_colors) + [self.color_hole,self.color_hole,self.color_hole]))
             signal_3px = signal_3px * after.max()/before.max()
-        print(signal_3px)
 
-        if 3 in mask_obj.width_map:
-            mask_obj.signal[mask_obj.width_map == 2] = np.clip(mask_obj.signal[mask_obj.width_map == 3].max() * 1.1,0,255)
-            mask_obj.signal[mask_obj.width_map == 3] = np.clip(mask_obj.signal[mask_obj.width_map == 3].max() * 1.03,0,255)
-
-        elif 2 in mask_obj.width_map:
-            mask_obj.signal[mask_obj.width_map == 2] = np.clip(signal_3px.max() * 1.2,0,255)
-            mask_obj.signal[mask_obj.width_map == 1] = np.clip(signal_3px.max() * 1.4,0,255)
+        if 3 in mask_obj.width_map and 4 in mask_obj.width_map:
+            mask_obj.signal[mask_obj.width_map > 0 ] = mask_obj.signal[mask_obj.width_map > 0] * 0.9
+        if 2 in mask_obj.width_map and 3 not in mask_obj.width_map:
+            mask_obj.signal[mask_obj.width_map == 2] = np.clip(signal_3px.max() * 1.1,0,255)
+            mask_obj.signal[mask_obj.width_map == 1] = np.clip(signal_3px.max() * 1.2,0,255)
         elif 1 in mask_obj.width_map:
             mask_obj.signal[mask_obj.width_map == 2] = np.clip(signal_3px.max() * 1.3,0,255)
             mask_obj.signal[mask_obj.width_map == 1] = np.clip(signal_3px.max() * 1.5,0,255)
@@ -619,87 +591,4 @@ class Solver():
         finally:
             pool.close()
             pool.join()
-        print('Processing time multi v1: {0} [sec]'.format(time.time() - start_multi_time_v1))
-
-        
-if __name__ == '__main__':
-    mask_w, mask_h = 400, 400
-    border_width=1
-
-    radius=50
-    algo='algo1'
-    pixel_size=12
-    resist_thickness=700
-    transform_algo = 'bezier'
-
-    circle_image = 255*np.zeros((mask_w, mask_h), dtype=np.uint8) # blank image
-
-    center = (mask_w//2, mask_h//2)
-
-    if border_width==1:
-        cv2.circle(circle_image, center, radius, 255, 2)
-        cv2.circle(circle_image, center, radius, 255, -1)
-        cont, _ = cv2.findContours(circle_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-        circle_image = 255*np.zeros((mask_w, mask_h), dtype=np.uint8) # blank image
-        cv2.drawContours(circle_image, cont, 0, 128, 2)
-        cv2.circle(circle_image, center, radius, 255, 2)
-        cv2.circle(circle_image, center, radius, 255, -1)
-
-    else:
-        cv2.circle(circle_image, center, radius+border_width, 128, 2)
-        cv2.circle(circle_image, center, radius+border_width, 128, -1)
-        cv2.circle(circle_image, center, radius, 255, 2)
-        cv2.circle(circle_image, center, radius, 255, -1)
-
-
-    square_image = 255*np.zeros((mask_w, mask_h), dtype=np.uint8) # blank image
-    center = (mask_w//2, mask_h//2)
-
-    square_image = cv2.rectangle(square_image, (center[0] - (radius + border_width), center[1]-(radius + border_width)), 
-                (center[0] + (radius + border_width), center[1]+ (radius + border_width)), 128, 20) 
-    square_image = cv2.rectangle(square_image, (center[0] - (radius + border_width), center[1]-(radius + border_width)), 
-                (center[0] + (radius + border_width), center[1]+ (radius + border_width)), 128, -1)
-
-    square_image = cv2.rectangle(square_image, (center[0] - (radius), center[1]-(radius)), 
-                (center[0] + (radius), center[1]+ (radius)), 255, 20) 
-    square_image = cv2.rectangle(square_image, (center[0] - (radius), center[1]-(radius)), 
-                (center[0] + (radius), center[1]+ (radius)), 255, -1)
-    
-
-    # hren = cv2.imread('./hren.png', 0)
-
-    # mask_not_hole = cv2.inRange(hren, 0, 128)
-    # hren[mask_not_hole > 0] = 128
-
-    # mask_not_back = cv2.inRange(hren, 128, 255)
-    # hren[mask_not_back > 128] = 255
-
-
-    
-
-    solv = Solver(algo=algo, transform_algo = transform_algo, pixel_size=pixel_size, \
-                      resist_thickness=resist_thickness, masks = [circle_image, square_image])
-    
-    circle_signal = solv.mask_objects[0].signal
-    square_signal = solv.mask_objects[1].signal
-
-    # print(circle_signal[200,:])
-
-    cv2.imwrite('./circle_signal1.png', circle_signal)
-    cv2.imwrite('./square_signal1.png', square_signal)
-
-    # hren_signal = solv.mask_objects[2].signal
-
-    fig, ax = plt.subplots(2, 2, figsize=(10,10))
-    ax[0, 0].imshow(circle_signal)
-    ax[1, 0].plot(circle_signal[200,:])
-    ax[1, 0].grid()
-
-    ax[0, 1].imshow(square_signal)
-    ax[1, 1].plot(square_signal[200,:])
-    ax[1, 1].grid()
-
-
-    # ax[2].imshow(hren_signal)
-    plt.show()
-
+        print('Processing time: {0} [sec]'.format(time.time() - start_multi_time_v1))
