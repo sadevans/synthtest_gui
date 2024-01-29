@@ -465,10 +465,12 @@ class MainWindow(QMainWindow):
                 # self.solv.mask_objects[0].signal = self.solv.GetSignalE(self.solv.mask_objects[0].mask, self.solv.mask_objects[0].angles_map, self.solv.mask_objects[0].color_map).astype(np.uint8)
                 # self.solv.mask_objects[1].signal = self.solv.GetSignalE(self.solv.mask_objects[1].mask, self.solv.mask_objects[1].angles_map, self.solv.mask_objects[1].color_map).astype(np.uint8)
         else:
+            QApplication.setOverrideCursor(Qt.CursorShape.BusyCursor)
+
             self.solv = Solver(algo=self.algo, signal_formula = self.signal_formula, pixel_size=self.pixel_size, \
                       resist_thickness=self.resist_thickness, k=self.k_value, E=self.E_value, masks = [self.circle_image, self.square_image],\
                         recalculate=flag_recalculate, dp2=self.dp2, dp3=self.dp3)
-
+            QApplication.restoreOverrideCursor()
 
         self.circle_signal = self.solv.mask_objects[0].signal
         self.square_signal = self.solv.mask_objects[1].signal

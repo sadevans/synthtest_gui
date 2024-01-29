@@ -9,12 +9,15 @@ import time
 from functools import lru_cache
 from skimage.draw import line
 from src.ImageClass import *
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QApplication
 
 
 
 class Solver():
     def __init__(self, algo: str, signal_formula: str, pixel_size: int, resist_thickness: int, k: float, E: float, masks: list, recalculate: bool,\
                  dp2:tuple, dp3:tuple):
+        # self.parent_ = parent
         self.algo = algo
         self.signal_formula = signal_formula
         self.pixel_size = pixel_size
@@ -137,7 +140,7 @@ class Solver():
 
                         reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
                         angles = np.arctan(np.abs(np.gradient(y)))
-                        if dist_==2:print(angles)
+                        # if dist_==2:print(angles)
                         new_angl = angles[::self.pixel_size]
                         reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
                         averages_angls = np.max(reshaped_angls, axis=1)
@@ -185,7 +188,7 @@ class Solver():
                         averages_y = np.max(reshaped_y, axis=1)
                         reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
                         angles = np.arctan(np.abs(np.gradient(y)))
-                        if dist_==2:print(angles)
+                        # if dist_==2:print(angles)
                         
                         reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
                         averages_angls = np.max(reshaped_angls, axis=1)
@@ -454,7 +457,7 @@ class Solver():
         color_map[img == 255] = 0
         return width_img, new_angles, color_map
     
-
+    # original
     def GetSignalk(self, img, angles, color_map):
         signal = np.zeros_like(img, dtype=np.float32)
         alpha_bord = angles[img == 128].copy()
@@ -478,11 +481,35 @@ class Solver():
         return signal
     
 
+    # def GetSignalk(self, img, angles, color_map):
+    #     signal = np.zeros_like(img, dtype=np.float32)
+    #     alpha_bord = angles[img == 128].copy()
+    #     # alpha_bord[alpha_bord==alpha_bord.min()] = np.radians(1)
+    #     # print(alpha_bord.max(), color_map[angles==alpha_bord.max()])
+    #     alpha_bord[alpha_bord==0.0] = np.radians(1)
+
+    #     alpha_back = angles[img == 0].copy()
+    #     # print('ALPHA BACK: ', alpha_back)
+    #     alpha_hole = angles[img == 255].copy()
+    #     signal[img == 0] = (self.k*(1/(np.abs(np.cos(np.radians(alpha_back)))**(0.87)))+1) * color_map[img==0]
+
+    #     # signal[img == 128] = (self.k * (1/(np.abs(np.cos(np.radians(90)-(np.radians(180 - 90) - alpha_bord)))**(0.87)) - 1) + 1) *color_map[img==128]
+    #     signal[img == 128] = (self.k * (1/(np.abs(np.cos((alpha_bord)))**(1.1)))+1) *color_map[img==128]
+        
+    #     signal[img == 255] = (self.k * (1 / (np.abs(np.cos(np.radians(alpha_hole)))**(1.1)))+1) * color_map[img==255]
+
+    #     signal = np.clip(signal, 0, 255)
+
+    #     # signal = cv2.GaussianBlur(signal, (11,11), 0)
+    #     # signal = cv2.GaussianBlur(signal, (9,9), 0)
+    #     return signal
+    
+
     def GetSignalE(self, img, angles, color_map):
         signal = np.zeros_like(img, dtype=np.float32)
 
         alpha_bord = angles[img == 128].copy()
-        alpha_bord[alpha_bord==alpha_bord.min()] = np.radians(1)
+        alpha_bord[alpha_bord==0.0] = np.radians(1)
 
         alpha_back = angles[img == 0].copy()
         alpha_hole = angles[img == 255].copy()
@@ -502,11 +529,11 @@ class Solver():
 
     def process(self):
         start_ = time.time()
-
+        # QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         for mask in self.masks_list:
             self.mask_objects.append(self.process_single_image(mask))
 
-
+        # QApplication.restoreOverrideCursor()
         print('Processing time: {0} [sec]'.format(time.time() - start_))
 
             # print(mask_obj.objects[0].hole_contour, mask_obj.objects[0].border_contour)
@@ -527,59 +554,12 @@ class Solver():
                 mask_obj.angles_map[mask_obj.mask != 128] = 0.0
 
                 mask_obj.signal = self.GetSignal(mask_obj).copy()
-
-                # was start
-                # if self.signal_formula == 'formula_k' : signal = self.GetSignalk(mask_obj.mask, mask_obj.angles_map, mask_obj.color_map)
-                # elif self.signal_formula == 'formula_e' : signal = self.GetSignalE(mask_obj.mask, mask_obj.angles_map, mask_obj.color_map)
-
-
-                # nonzero = np.argwhere(signal != 0)
-                # for pixel in nonzero:
-                #     if mask_obj.mask[pixel[0], pixel[1]] != 0:
-                #         mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
-
-                #     elif mask_obj.mask[pixel[0], pixel[1]] == 0:
-                #         mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
-
-                # mask_obj.signal[mask_obj.signal == 0] = np.unique(mask_obj.signal)[1] + 1
-                # before = mask_obj.signal[mask_obj.mask==128].max()
-                # print(before)
-                # was end
-
-                # print(mask_obj.signal[mask_obj.mask==128])
-                # mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (11,11), 0), 0, 255)    #was
-                # mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (5,5), 0), 0, 255)
-                # mask_obj.signal = cv2.bilateralFilter(mask_obj.signal, d=9, sigmaColor=75, sigmaSpace=75)
-                # mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (7,7), 0), 0, 255)
-
-
-                # kernel = np.array([[1, 2, 1],
-                #    [2, 4, 2],
-                #    [1, 2, 1]], dtype=np.float32)
-                # kernel = kernel / np.sum(kernel)
-                # mask_obj.signal = np.clip(cv2.filter2D(mask_obj.signal, -1, kernel), 0, 255)
-
-                # kernel_size = 7
-                # kernel = cv2.getGaussianKernel(kernel_size, 0)
-                # mask_obj.signal = np.clip(cv2.sepFilter2D(mask_obj.signal, -1, kernel, kernel), 0, 255)
-                # mask_obj.signal = np.clip(cv2.adaptiveBlur(mask_obj.signal, (15, 15), 0), 0, 255)
-
-                # mask_obj.signal = cv2.bilateralFilter(mask_obj.signal, d=11, sigmaColor=81, sigmaSpace=81)
-                # mask_obj.signal = cv2.GaussianBlur(mask_obj.signal, (3,3), 0)
-
-                # mask_obj.signal = cv2.medianBlur(mask_obj.signal, 3)
-                # mask_obj.signal = cv2.GaussianBlur(mask_obj.signal, (11,11), 0)
-                # after = mask_obj.signal[mask_obj.mask==128].max()     #was
-                # mask_obj.signal[width==2] = mask_obj.signal[width==2]*(1.2)
-                # mask_obj.signal[width==1] = mask_obj.signal[width==1]*(1.3)
-                # mask_obj.signal = mask_obj.signal.astype(np.uint8)    #was
         return mask_obj
 
 
     def GetSignal(self, mask_obj):
         if self.signal_formula == 'formula_k' : signal = self.GetSignalk(mask_obj.mask, mask_obj.angles_map, mask_obj.color_map)
         elif self.signal_formula == 'formula_e' : signal = self.GetSignalE(mask_obj.mask, mask_obj.angles_map, mask_obj.color_map)
-
 
         nonzero = np.argwhere(signal != 0)
         for pixel in nonzero:
@@ -590,11 +570,41 @@ class Solver():
                 mask_obj.signal[pixel[0], pixel[1]] = signal[pixel[0], pixel[1]]
 
         mask_obj.signal[mask_obj.signal == 0] = np.unique(mask_obj.signal)[1] + 1
-        before = mask_obj.signal[mask_obj.mask==128].max()
-        # print(mask_obj.signal[mask_obj.mask==128])
+        # before = mask_obj.signal[mask_obj.mask==128]
+        before = mask_obj.signal[mask_obj.width_map < 3]
         mask_obj.signal = np.clip(cv2.GaussianBlur(mask_obj.signal, (11,11), 0), 0, 255)
-        mask_obj.signal = mask_obj.signal.astype(np.uint8)
+        # after = mask_obj.signal[mask_obj.mask==128]
+        after = mask_obj.signal[mask_obj.width_map < 3]
 
+        if 1 in mask_obj.width_map or 2 in mask_obj.width_map:
+            new_line = np.zeros(3*self.pixel_size, dtype=np.float32)
+            x, y = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, 100, self.resist_thickness)
+            x, colors = self.bezier(new_line, np.linspace(0, 1, len(new_line)), 0.0, self.color_hole, self.color_back)
+            reshaped_colors  = np.array(colors).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+            angles = np.arctan(np.abs(np.gradient(y)))
+            reshaped_angls  = np.array(angles).reshape(-1, self.pixel_size)  # Разбиваем на подмассивы по self.pixel_size элементов
+            averages_angls = np.max(reshaped_angls, axis=1)
+            max_indices = np.argmax(reshaped_angls, axis=1)
+            averages_colors = reshaped_colors[np.arange(len(reshaped_colors)), max_indices]
+            mask_3px = np.array([0, 0, 0, 128, 128, 128, 255, 255, 255])
+            signal_3px = self.GetSignalk(mask_3px, np.array([0,0,0] + list(averages_angls) + [0,0,0]), np.array([self.color_back,self.color_back,self.color_back] \
+                                                                                    + list(averages_colors) + [self.color_hole,self.color_hole,self.color_hole]))
+            signal_3px = signal_3px * after.max()/before.max()
+        print(signal_3px)
+
+        if 3 in mask_obj.width_map:
+            mask_obj.signal[mask_obj.width_map == 2] = np.clip(mask_obj.signal[mask_obj.width_map == 3].max() * 1.1,0,255)
+            mask_obj.signal[mask_obj.width_map == 3] = np.clip(mask_obj.signal[mask_obj.width_map == 3].max() * 1.03,0,255)
+
+        elif 2 in mask_obj.width_map:
+            mask_obj.signal[mask_obj.width_map == 2] = np.clip(signal_3px.max() * 1.2,0,255)
+            mask_obj.signal[mask_obj.width_map == 1] = np.clip(signal_3px.max() * 1.4,0,255)
+        elif 1 in mask_obj.width_map:
+            mask_obj.signal[mask_obj.width_map == 2] = np.clip(signal_3px.max() * 1.3,0,255)
+            mask_obj.signal[mask_obj.width_map == 1] = np.clip(signal_3px.max() * 1.5,0,255)
+
+        mask_obj.signal = mask_obj.signal.astype(np.uint8)
+        # print('MAX VALUE: ', mask_obj.signal.max())
 
         return mask_obj.signal
 
