@@ -15,6 +15,11 @@ git clone https://github.com/sadevans/synthtest_gui.git
 python -m venv venv
 ```
 
+Активируйте ее:
+```bash
+source venv/bin/activate
+```
+
 После установите зависимости из **requirements.txt**:
 ```bash
 pip install -r requirements.txt
