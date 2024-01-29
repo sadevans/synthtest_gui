@@ -26,4 +26,8 @@ pip install -r requirements.txt
 ```
 
 ## Использование GUI
+Для запуска GUI необходимо запустить файл **run.py**:
+```bash
+python run.py
+```
 Все параметры в конфигураторе изменяемы.
