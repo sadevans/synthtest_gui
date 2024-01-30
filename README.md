@@ -31,3 +31,8 @@ pip install -r requirements.txt
 python run.py
 ```
 Все параметры в конфигураторе изменяемы.
+
+## Инструкция по использованию
+
+Скринкаст с демонстрацией использования можно посмотреть по ссылке: https://drive.google.com/drive/folders/1AVdjsn_6ukyeI6eH3tnN0t5wyG4s5Se9?usp=sharing
+
