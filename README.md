@@ -23,6 +23,15 @@ source venv/bin/activate
 ```bash
 pip install -r requirements.txt
 ```
+### Если возникла проблема с PyQt6
+Если у вас возникла проблема с установкой PyQt6 с помощью файла requirements, и в командной строке появляется что-то вроед этого:
+![image](https://github.com/sadevans/synthtest_gui/assets/82286355/b628b2d6-f8fb-4ded-9c93-5d74c66d584a)
+
+Запустите следующую команду:
+```bash
+pip install pip setuptools --upgrade && pip3 install PyQt6
+```
+
 
 ## Использование GUI
 Для запуска GUI необходимо запустить файл **run.py**:
